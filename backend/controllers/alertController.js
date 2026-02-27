@@ -41,9 +41,16 @@ exports.markRead = async (req, res) => {
 // PUT /api/alerts/:id/resolve
 exports.resolve = async (req, res) => {
     try {
+        const { actionTaken } = req.body || {};
+
         const alert = await Alert.findOneAndUpdate(
             { _id: req.params.id, owner: req.user._id },
-            { isRead: true, isResolved: true },
+            {
+                isRead: true,
+                isResolved: true,
+                actionTaken: actionTaken || '',
+                resolvedAt: new Date(),
+            },
             { new: true }
         );
 

@@ -1,59 +1,77 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    AlertTriangle, Thermometer, Droplets, Clock, Bell, Check,
-    ChevronDown, ChevronUp, Warehouse, Truck, ShieldAlert
+    AlertTriangle, Thermometer, Droplets, Clock, Bell,
+    ChevronDown, ChevronUp, ShieldCheck, Truck,
 } from 'lucide-react';
 import type { AlertData } from '../services/warehouseService';
+import warehouseService from '../services/warehouseService';
+import { PreventiveMeasuresPanel } from './PreventiveMeasuresPanel';
+import toast from 'react-hot-toast';
 
 interface AlertPanelProps {
     alerts: AlertData[];
     onResolve?: (id: string) => void;
+    /** Called when farmer clicks "Sell / Dispatch" on an alert */
+    onSellDispatch?: (alert: AlertData) => void;
 }
 
-const severityConfig: Record<string, { accent: string; bg: string; border: string; text: string; iconColor: string; badge: string }> = {
-    low: { accent: 'border-l-blue-400', bg: 'bg-blue-50/60', border: 'border-blue-100', text: 'text-blue-800', iconColor: 'text-blue-500', badge: 'bg-blue-100 text-blue-700' },
-    medium: { accent: 'border-l-amber-400', bg: 'bg-amber-50/60', border: 'border-amber-100', text: 'text-amber-800', iconColor: 'text-amber-500', badge: 'bg-amber-100 text-amber-700' },
-    high: { accent: 'border-l-orange-500', bg: 'bg-orange-50/60', border: 'border-orange-100', text: 'text-orange-800', iconColor: 'text-orange-500', badge: 'bg-orange-100 text-orange-700' },
-    critical: { accent: 'border-l-red-500', bg: 'bg-red-50/60', border: 'border-red-100', text: 'text-red-800', iconColor: 'text-red-500', badge: 'bg-red-100 text-red-700' },
+const severityConfig = {
+    low: { icon: Bell, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-500' },
+    medium: { icon: Bell, bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', iconColor: 'text-yellow-500' },
+    high: { icon: AlertTriangle, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', iconColor: 'text-orange-500' },
+    critical: { icon: AlertTriangle, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
 };
 
-const alertTypeConfig: Record<string, { icon: React.FC<{ className?: string }>; actionLabel: string }> = {
-    humidity_breach: { icon: Droplets, actionLabel: 'Improve ventilation' },
-    temp_breach: { icon: Thermometer, actionLabel: 'Check cooling system' },
-    overdue: { icon: Clock, actionLabel: 'Dispatch soon' },
-    spoilage_risk: { icon: AlertTriangle, actionLabel: 'Inspect produce' },
-    capacity_warning: { icon: Warehouse, actionLabel: 'Shift stock' },
-    custom: { icon: Bell, actionLabel: 'Review' },
+const alertTypeIcons: Record<string, React.FC<{ className?: string }>> = {
+    humidity_breach: Droplets,
+    temp_breach: Thermometer,
+    overdue: Clock,
+    spoilage_risk: AlertTriangle,
+    custom: Bell,
 };
 
-export const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onResolve }) => {
+export const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onResolve, onSellDispatch }) => {
     const [expanded, setExpanded] = React.useState(true);
+    const [expandedPreventive, setExpandedPreventive] = React.useState<string | null>(null);
+    const unreadCount = alerts.filter((a) => !a.isRead).length;
 
-    // Only show unresolved alerts
-    const activeAlerts = alerts.filter((a) => !a.isResolved);
-    const resolvedCount = alerts.filter((a) => a.isResolved).length;
+    const handlePreventiveConfirm = async (alert: AlertData) => {
+        try {
+            // 1. Resolve the alert with "Preventive measures taken"
+            await warehouseService.resolveAlert(alert._id, 'Preventive measures taken');
+
+            // 2. Downgrade lot condition to "watch" if it was worse
+            if (alert.lot?._id) {
+                await warehouseService.updateLot(alert.lot._id, { currentCondition: 'watch' });
+                // 3. Log timeline event
+                await warehouseService.addLotEvent(alert.lot._id, {
+                    eventType: 'inspection_done',
+                    description: `Farmer confirmed preventive measures for ${alert.alertType.replace(/_/g, ' ')} alert`,
+                });
+            }
+
+            toast.success('✅ Preventive action recorded. Condition updated.');
+            setExpandedPreventive(null);
+            onResolve?.(alert._id);
+        } catch (err) {
+            toast.error('Failed to save action.');
+        }
+    };
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-[#5B532C]/10 overflow-hidden">
             {/* Header */}
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/50 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50/50 transition-colors"
             >
-                <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 rounded-lg bg-red-50">
-                        <ShieldAlert className="w-4 h-4 text-red-500" />
-                    </div>
+                <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-[#5B532C]/60" />
                     <span className="font-semibold text-sm text-[#5B532C]">Alerts</span>
-                    {activeAlerts.length > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold min-w-[20px] text-center animate-pulse">
-                            {activeAlerts.length}
-                        </span>
-                    )}
-                    {resolvedCount > 0 && (
-                        <span className="text-xs text-[#63A361]/70 font-medium">
-                            ✓ {resolvedCount} resolved
+                    {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold min-w-[20px] text-center">
+                            {unreadCount}
                         </span>
                     )}
                 </div>
@@ -73,72 +91,85 @@ export const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onResolve }) => 
                         exit={{ height: 0 }}
                         className="overflow-hidden"
                     >
-                        {activeAlerts.length === 0 ? (
-                            <div className="p-6 text-center">
-                                <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-2">
-                                    <Check className="w-5 h-5 text-[#63A361]" />
-                                </div>
-                                <p className="text-sm text-[#5B532C]/50 font-medium">All clear — no active alerts 🌿</p>
+                        {alerts.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-[#5B532C]/40">
+                                No active alerts — everything looks great! 🌿
                             </div>
                         ) : (
-                            <div className="space-y-2 p-3 max-h-96 overflow-y-auto">
-                                {activeAlerts.map((alert, i) => {
+                            <div className="divide-y divide-[#5B532C]/5 max-h-[600px] overflow-y-auto">
+                                {alerts.map((alert) => {
                                     const severity = severityConfig[alert.severity] || severityConfig.medium;
-                                    const typeConfig = alertTypeConfig[alert.alertType] || alertTypeConfig.custom;
-                                    const Icon = typeConfig.icon;
+                                    const Icon = alertTypeIcons[alert.alertType] || Bell;
+                                    const isPreventiveOpen = expandedPreventive === alert._id;
+                                    const warehouseName = alert.warehouse?.name || 'Warehouse';
+
                                     return (
                                         <motion.div
                                             key={alert._id}
-                                            initial={{ opacity: 0, x: -10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: 10, height: 0 }}
-                                            transition={{ delay: i * 0.05 }}
-                                            className={`rounded-lg border ${severity.border} border-l-4 ${severity.accent} ${severity.bg} p-3.5`}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className={`px-4 py-3 ${severity.bg}`}
                                         >
-                                            {/* Top row: icon + message + severity badge */}
                                             <div className="flex items-start gap-3">
-                                                <div className="mt-0.5 flex-shrink-0">
-                                                    <Icon className={`w-4.5 h-4.5 ${severity.iconColor}`} />
-                                                </div>
+                                                <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${severity.iconColor}`} />
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-start justify-between gap-2 mb-1">
-                                                        <p className={`text-sm font-semibold ${severity.text} leading-snug`}>
-                                                            {alert.message}
+                                                    {/* Alert title + crop name */}
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <p className={`text-sm font-semibold ${severity.text}`}>
+                                                            {alert.lot?.cropName || 'Produce'}
+                                                            {alert.lot?.lotId ? ` (${alert.lot.lotId})` : ''}
                                                         </p>
-                                                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${severity.badge}`}>
-                                                            {alert.severity}
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${alert.severity === 'critical' ? 'bg-red-500 text-white' :
+                                                                alert.severity === 'high' ? 'bg-orange-500 text-white' :
+                                                                    alert.severity === 'medium' ? 'bg-yellow-400 text-yellow-900' :
+                                                                        'bg-blue-400 text-white'
+                                                            }`}>
+                                                            {alert.severity.toUpperCase()} RISK
                                                         </span>
                                                     </div>
 
-                                                    {/* Recommendation */}
-                                                    {alert.recommendation && (
-                                                        <p className="text-xs text-[#5B532C]/55 mt-1 leading-relaxed">
-                                                            💡 {alert.recommendation}
-                                                        </p>
-                                                    )}
-
-                                                    {/* Timestamp */}
-                                                    <p className="text-[10px] text-[#5B532C]/30 mt-1.5">
-                                                        {new Date(alert.triggeredAt).toLocaleString('en-IN', {
-                                                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-                                                        })}
+                                                    {/* Message */}
+                                                    <p className={`text-sm ${severity.text} mt-0.5`}>
+                                                        {alert.message}
                                                     </p>
 
-                                                    {/* Action buttons */}
-                                                    <div className="flex items-center gap-2 mt-2.5">
-                                                        <button
-                                                            onClick={() => onResolve?.(alert._id)}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#63A361] hover:bg-[#63A361]/90 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
-                                                        >
-                                                            <Check className="w-3 h-3" />
-                                                            Resolve
-                                                        </button>
-                                                        <span className="flex items-center gap-1 px-2.5 py-1.5 bg-white/70 text-[#5B532C]/60 text-xs font-medium rounded-lg border border-[#5B532C]/10">
-                                                            {alert.alertType === 'capacity_warning' && <Warehouse className="w-3 h-3" />}
-                                                            {alert.alertType === 'overdue' && <Truck className="w-3 h-3" />}
-                                                            {typeConfig.actionLabel}
-                                                        </span>
+                                                    {/* Meta: warehouse + time */}
+                                                    <div className="flex items-center gap-3 mt-1 text-[10px] text-[#5B532C]/40">
+                                                        <span>📍 {warehouseName}</span>
+                                                        <span>{new Date(alert.triggeredAt).toLocaleString('en-IN')}</span>
                                                     </div>
+
+                                                    {/* Two action buttons (only if preventive panel is NOT open) */}
+                                                    {!isPreventiveOpen && (
+                                                        <div className="flex gap-2 mt-3">
+                                                            <button
+                                                                onClick={() => setExpandedPreventive(alert._id)}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-300 bg-teal-50 text-teal-700 text-xs font-medium hover:bg-teal-100 transition-colors"
+                                                            >
+                                                                <ShieldCheck className="w-3.5 h-3.5" />
+                                                                Preventive Measures
+                                                            </button>
+                                                            <button
+                                                                onClick={() => onSellDispatch?.(alert)}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                                                            >
+                                                                <Truck className="w-3.5 h-3.5" />
+                                                                Sell / Dispatch
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Preventive measures expanded panel */}
+                                                    <AnimatePresence>
+                                                        {isPreventiveOpen && (
+                                                            <PreventiveMeasuresPanel
+                                                                alert={alert}
+                                                                warehouseType="dry"
+                                                                onConfirm={() => handlePreventiveConfirm(alert)}
+                                                                onBack={() => setExpandedPreventive(null)}
+                                                            />
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
                                             </div>
                                         </motion.div>

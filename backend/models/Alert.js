@@ -18,6 +18,8 @@ const alertSchema = new mongoose.Schema({
     recommendation: { type: String, default: '' },
     isRead: { type: Boolean, default: false },
     isResolved: { type: Boolean, default: false },
+    actionTaken: { type: String, default: '' },
+    resolvedAt: { type: Date, default: null },
     triggeredAt: { type: Date, default: Date.now },
 });
 

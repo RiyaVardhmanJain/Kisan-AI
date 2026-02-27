@@ -4,7 +4,7 @@ import {
     Plus, Warehouse as WarehouseIcon, MapPin,
     Package, X, Filter, RefreshCw,
     Thermometer, Zap, ShieldCheck, Truck, CheckCircle,
-    Eye as EyeIcon, TrendingUp, DollarSign, Clock as ClockIcon,
+    TrendingUp, DollarSign, Clock as ClockIcon,
     AlertTriangle, Activity,
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -16,6 +16,7 @@ import { LotCard } from '../components/LotCard';
 import { AlertPanel } from '../components/AlertPanel';
 import { LotTimeline } from '../components/LotTimeline';
 import { SpoilageAlert } from '../components/SpoilageAlert';
+import { DispatchConfirmForm } from '../components/DispatchConfirmForm';
 import { analyzeStorageConditions } from '../ai/storageService';
 import type { StorageUnit, StorageAnalysisResult } from '../ai/storagePrompt';
 import { getDistributionRecommendation, type DistributionResult, type StatePrice } from '../ai/marketService';
@@ -166,7 +167,11 @@ const Warehouse: React.FC = () => {
     const [dispatchQty, setDispatchQty] = useState('');
     const [distAnalyzing, setDistAnalyzing] = useState(false);
     const [distResult, setDistResult] = useState<DistributionResult | null>(null);
-    const [distFilter, setDistFilter] = useState<'all' | 'local' | 'state' | 'outer'>('all');
+
+    // Alert → Dispatch flow state
+    const [dispatchAlert, setDispatchAlert] = useState<AlertData | null>(null);
+    const [dispatchLotForAlert, setDispatchLotForAlert] = useState<LotData | null>(null);
+    const [showDispatchBar, setShowDispatchBar] = useState(false);
 
     /* ─── Data loading ─── */
     const loadData = useCallback(async () => {
@@ -214,21 +219,6 @@ const Warehouse: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [loadData]);
-
-    // Auto-refresh conditions every 30s when on Monitor tab
-    useEffect(() => {
-        if (activeTab !== 'monitor') return;
-        const interval = setInterval(() => {
-            loadData();
-        }, 30000);
-        return () => clearInterval(interval);
-    }, [activeTab, loadData]);
-
-    // KPI computations
-    const totalCapacity = warehouses.reduce((s, w) => s + w.capacityQuintals, 0);
-    const totalUsed = warehouses.reduce((s, w) => s + w.usedCapacity, 0);
-    const capacityPct = totalCapacity > 0 ? Math.round((totalUsed / totalCapacity) * 100) : 0;
-    const atRiskLots = lots.filter(l => l.currentCondition === 'at_risk' || l.currentCondition === 'spoiled').length;
 
     /* ─── Actions ─── */
     const handleAddWarehouse = async (e: React.FormEvent) => {
@@ -300,14 +290,22 @@ const Warehouse: React.FC = () => {
         }
     };
 
-    const handleUpdateStatus = async (lot: LotData, newStatus: string) => {
-        try {
-            await warehouseService.updateLot(lot._id, { status: newStatus } as any);
-            setLots((prev) => prev.map((l) => (l._id === lot._id ? { ...l, status: newStatus as any } : l)));
-            toast.success(`Lot marked as ${newStatus.replace(/_/g, ' ')}`);
-        } catch {
-            toast.error('Failed to update lot status');
+    /* ─── Alert "Sell / Dispatch" flow ─── */
+    const handleSellDispatch = (alert: AlertData) => {
+        const alertLotId = typeof alert.lot === 'object' && alert.lot !== null ? alert.lot._id : null;
+        const linkedLot = alertLotId ? lots.find((l) => l._id === alertLotId) : null;
+
+        setActiveTab('distribution');
+
+        if (linkedLot) {
+            setSelectedDistLot(linkedLot);
+            setDispatchQty(String(linkedLot.quantityQuintals));
+            setDistResult(null);
         }
+
+        setDispatchAlert(alert);
+        setDispatchLotForAlert(linkedLot || null);
+        setShowDispatchBar(true);
     };
 
     /* ─── Monitor tab: AI analysis ─── */
@@ -473,41 +471,7 @@ const Warehouse: React.FC = () => {
                         {/* ════════════════════════════════════════════ */}
                         {activeTab === 'storage' && (
                             <>
-                                {/* KPI Summary Bar */}
-                                {warehouses.length > 0 && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2"
-                                    >
-                                        <div className="bg-white rounded-xl p-4 border border-[#5B532C]/10 shadow-sm">
-                                            <p className="text-xs text-[#5B532C]/50 uppercase tracking-wide">Stored Lots</p>
-                                            <p className="text-2xl font-bold text-[#5B532C] mt-1">{lots.length}</p>
-                                        </div>
-                                        <div className="bg-white rounded-xl p-4 border border-[#5B532C]/10 shadow-sm">
-                                            <p className="text-xs text-[#5B532C]/50 uppercase tracking-wide">Capacity Used</p>
-                                            <p className={`text-2xl font-bold mt-1 ${capacityPct > 90 ? 'text-red-600' : capacityPct > 70 ? 'text-amber-600' : 'text-[#63A361]'}`}>
-                                                {capacityPct}%
-                                            </p>
-                                            <p className="text-xs text-[#5B532C]/40">{totalUsed}/{totalCapacity} qtl</p>
-                                        </div>
-                                        <div className="bg-white rounded-xl p-4 border border-[#5B532C]/10 shadow-sm">
-                                            <p className="text-xs text-[#5B532C]/50 uppercase tracking-wide">At Risk</p>
-                                            <p className={`text-2xl font-bold mt-1 ${atRiskLots > 0 ? 'text-red-600' : 'text-[#63A361]'}`}>
-                                                {atRiskLots}
-                                            </p>
-                                            <p className="text-xs text-[#5B532C]/40">{atRiskLots > 0 ? 'lots need attention' : 'all healthy'}</p>
-                                        </div>
-                                        <div className="bg-white rounded-xl p-4 border border-[#5B532C]/10 shadow-sm">
-                                            <p className="text-xs text-[#5B532C]/50 uppercase tracking-wide">Alerts</p>
-                                            <p className={`text-2xl font-bold mt-1 ${unresolvedAlerts.length > 0 ? 'text-amber-600' : 'text-[#63A361]'}`}>
-                                                {unresolvedAlerts.length}
-                                            </p>
-                                            <p className="text-xs text-[#5B532C]/40">{unresolvedAlerts.length > 0 ? 'unresolved' : 'no issues'}</p>
-                                        </div>
-                                    </motion.div>
-                                )}
-
+                                {/* Warehouse Cards */}
                                 {warehouses.length === 0 ? (
                                     <motion.div
                                         initial={{ opacity: 0 }}
@@ -596,10 +560,11 @@ const Warehouse: React.FC = () => {
                                 )}
 
                                 {/* Alerts */}
-                                {alerts.length > 0 && (
+                                {alerts.filter(a => !a.isResolved).length > 0 && (
                                     <AlertPanel
-                                        alerts={alerts}
+                                        alerts={alerts.filter(a => !a.isResolved)}
                                         onResolve={handleResolveAlert}
+                                        onSellDispatch={handleSellDispatch}
                                     />
                                 )}
 
@@ -636,7 +601,6 @@ const Warehouse: React.FC = () => {
                                                     key={lot._id}
                                                     lot={lot}
                                                     onViewTimeline={handleViewTimeline}
-                                                    onUpdateStatus={handleUpdateStatus}
                                                 />
                                             ))}
                                         </div>
@@ -668,7 +632,7 @@ const Warehouse: React.FC = () => {
                                         ) : (
                                             <>
                                                 <Zap className="w-4 h-4" />
-                                                Quick Assessment
+                                                AI Analysis
                                             </>
                                         )}
                                     </button>
@@ -684,7 +648,10 @@ const Warehouse: React.FC = () => {
                                                 title={alert.alertType}
                                                 message={alert.message}
                                                 recommendation={alert.recommendation}
-                                                onDismiss={() => handleResolveAlert(alert._id)}
+                                                onDismiss={() => {
+                                                    warehouseService.markAlertRead(alert._id);
+                                                    setAlerts(prev => prev.filter(a => a._id !== alert._id));
+                                                }}
                                             />
                                         ))}
                                     </div>
@@ -867,31 +834,15 @@ const Warehouse: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Traceability Timeline */}
+                                                    {/* View Timeline Button */}
                                                     <div className="mt-4 pt-3 border-t border-[#5B532C]/5">
-                                                        <div className="flex items-center gap-2 overflow-x-auto">
-                                                            {[
-                                                                { label: 'Harvested', icon: Activity, done: true },
-                                                                { label: 'Stored', icon: WarehouseIcon, done: lot.status !== 'dispatched' || daysStored > 0 },
-                                                                { label: 'Quality Check', icon: EyeIcon, done: lot.currentCondition !== 'good' || daysStored > 1 },
-                                                                { label: 'Dispatched', icon: Truck, done: lot.status === 'dispatched' || lot.status === 'sold' },
-                                                            ].map((step, i) => (
-                                                                <React.Fragment key={i}>
-                                                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${step.done ? 'bg-[#63A361] text-white' : 'bg-gray-200 text-gray-400'
-                                                                            }`}>
-                                                                            {step.done ? <CheckCircle className="w-3.5 h-3.5" /> : <step.icon className="w-3 h-3" />}
-                                                                        </div>
-                                                                        <span className={`text-xs ${step.done ? 'text-[#5B532C]' : 'text-[#5B532C]/40'}`}>
-                                                                            {step.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    {i < 3 && (
-                                                                        <div className={`w-8 h-0.5 flex-shrink-0 ${step.done ? 'bg-[#63A361]' : 'bg-gray-200'}`} />
-                                                                    )}
-                                                                </React.Fragment>
-                                                            ))}
-                                                        </div>
+                                                        <button
+                                                            onClick={() => handleViewTimeline(lot)}
+                                                            className="flex items-center gap-2 text-xs font-medium text-[#63A361] hover:text-[#578f55] transition-colors"
+                                                        >
+                                                            <Activity className="w-3.5 h-3.5" />
+                                                            View Full Traceability History →
+                                                        </button>
                                                     </div>
                                                 </motion.div>
                                             );
@@ -906,6 +857,30 @@ const Warehouse: React.FC = () => {
                         {/* ════════════════════════════════════════════ */}
                         {activeTab === 'distribution' && (
                             <div>
+                                {/* Alert context banner */}
+                                {dispatchAlert && dispatchLotForAlert && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mb-4 p-4 rounded-xl border border-amber-300 bg-amber-50 flex items-start gap-3"
+                                    >
+                                        <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-semibold text-amber-800">
+                                                Alert Context: {dispatchLotForAlert.cropName} ({dispatchLotForAlert.lotId}) is at {dispatchAlert.severity.toUpperCase()} RISK
+                                            </p>
+                                            <p className="text-xs text-amber-700/70 mt-0.5">
+                                                {dispatchAlert.message}. Use the tool below to find the best market, then confirm your dispatch.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => { setDispatchAlert(null); setDispatchLotForAlert(null); setShowDispatchBar(false); }}
+                                            className="ml-auto flex-shrink-0 text-amber-400 hover:text-amber-600"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </motion.div>
+                                )}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Left: Lot Selection */}
                                     <div className="lg:col-span-1">
@@ -978,6 +953,7 @@ const Warehouse: React.FC = () => {
                                                             </>
                                                         ) : (
                                                             <>
+                                                                <Zap className="w-4 h-4" />
                                                                 Get Recommendation
                                                             </>
                                                         )}
@@ -1049,184 +1025,74 @@ const Warehouse: React.FC = () => {
                                                             Ranked Market Options
                                                         </h3>
 
-                                                        {/* Filter tabs */}
-                                                        <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
-                                                            {[
-                                                                { key: 'all' as const, label: 'All' },
-                                                                { key: 'local' as const, label: 'Local' },
-                                                                { key: 'state' as const, label: 'Same State' },
-                                                                { key: 'outer' as const, label: 'Outer State' },
-                                                            ].map((tab) => {
-                                                                // Count markets per filter
-                                                                const warehouseState = selectedDistLot && typeof selectedDistLot.warehouse === 'object'
-                                                                    ? (() => {
-                                                                        const city = selectedDistLot.warehouse.location?.city || '';
-                                                                        // Infer state from warehouse city by checking which state data includes it
-                                                                        if (mahaData.cities.some(c => c.city === city)) return 'Maharashtra';
-                                                                        if (karnatakaData.cities.some(c => c.city === city)) return 'Karnataka';
-                                                                        if (keralaData.cities.some(c => c.city === city)) return 'Kerala';
-                                                                        if (punjabData.cities.some(c => c.city === city)) return 'Punjab';
-                                                                        if (tamilnaduData.cities.some(c => c.city === city)) return 'Tamil Nadu';
-                                                                        if (andraData.cities.some(c => c.city === city)) return 'Andhra Pradesh';
-                                                                        if (teleganaData.cities.some(c => c.city === city)) return 'Telangana';
-                                                                        return 'Maharashtra';
-                                                                    })()
-                                                                    : 'Maharashtra';
-                                                                const warehouseCity = selectedDistLot && typeof selectedDistLot.warehouse === 'object'
-                                                                    ? selectedDistLot.warehouse.location?.city || ''
-                                                                    : '';
-                                                                const count = tab.key === 'all'
-                                                                    ? distResult.recommendedMarkets.length
-                                                                    : tab.key === 'local'
-                                                                        ? distResult.recommendedMarkets.filter(m => m.state === warehouseState && m.market.toLowerCase().includes(warehouseCity.toLowerCase().slice(0, 3))).length
-                                                                        : tab.key === 'state'
-                                                                            ? distResult.recommendedMarkets.filter(m => m.state === warehouseState).length
-                                                                            : distResult.recommendedMarkets.filter(m => m.state !== warehouseState).length;
-                                                                return (
-                                                                    <button
-                                                                        key={tab.key}
-                                                                        onClick={() => setDistFilter(tab.key)}
-                                                                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${distFilter === tab.key
-                                                                            ? 'bg-white text-[#5B532C] shadow-sm'
-                                                                            : 'text-[#5B532C]/50 hover:text-[#5B532C]/70'
-                                                                            }`}
-                                                                    >
-                                                                        {tab.label}
-                                                                        {count > 0 && (
-                                                                            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${distFilter === tab.key
-                                                                                ? 'bg-[#63A361]/10 text-[#63A361]'
-                                                                                : 'bg-gray-200 text-gray-500'
-                                                                                }`}>
-                                                                                {count}
-                                                                            </span>
-                                                                        )}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-
                                                         <div className="space-y-4">
-                                                            {(() => {
-                                                                const warehouseState = selectedDistLot && typeof selectedDistLot.warehouse === 'object'
-                                                                    ? (() => {
-                                                                        const city = selectedDistLot.warehouse.location?.city || '';
-                                                                        if (mahaData.cities.some(c => c.city === city)) return 'Maharashtra';
-                                                                        if (karnatakaData.cities.some(c => c.city === city)) return 'Karnataka';
-                                                                        if (keralaData.cities.some(c => c.city === city)) return 'Kerala';
-                                                                        if (punjabData.cities.some(c => c.city === city)) return 'Punjab';
-                                                                        if (tamilnaduData.cities.some(c => c.city === city)) return 'Tamil Nadu';
-                                                                        if (andraData.cities.some(c => c.city === city)) return 'Andhra Pradesh';
-                                                                        if (teleganaData.cities.some(c => c.city === city)) return 'Telangana';
-                                                                        return 'Maharashtra';
-                                                                    })()
-                                                                    : 'Maharashtra';
-                                                                const warehouseCity = selectedDistLot && typeof selectedDistLot.warehouse === 'object'
-                                                                    ? selectedDistLot.warehouse.location?.city || ''
-                                                                    : '';
-                                                                const filtered = distFilter === 'all'
-                                                                    ? distResult.recommendedMarkets
-                                                                    : distFilter === 'local'
-                                                                        ? distResult.recommendedMarkets.filter(m => m.state === warehouseState && m.market.toLowerCase().includes(warehouseCity.toLowerCase().slice(0, 3)))
-                                                                        : distFilter === 'state'
-                                                                            ? distResult.recommendedMarkets.filter(m => m.state === warehouseState)
-                                                                            : distResult.recommendedMarkets.filter(m => m.state !== warehouseState);
-                                                                if (filtered.length === 0) {
-                                                                    return (
-                                                                        <div className="text-center py-8">
-                                                                            <MapPin className="w-8 h-8 text-[#5B532C]/20 mx-auto mb-2" />
-                                                                            <p className="text-sm text-[#5B532C]/40">No markets found for this filter</p>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return filtered.map((market, idx) => (
-                                                                    <motion.div
-                                                                        key={idx}
-                                                                        initial={{ opacity: 0, x: -20 }}
-                                                                        animate={{ opacity: 1, x: 0 }}
-                                                                        transition={{ delay: idx * 0.1 }}
-                                                                        className={`p-4 rounded-lg border-2 ${idx === 0
-                                                                            ? 'border-[#63A361] bg-[#63A361]/5'
-                                                                            : 'border-[#5B532C]/10'
-                                                                            }`}
-                                                                    >
-                                                                        <div className="flex items-start justify-between">
-                                                                            <div className="flex items-start gap-3">
-                                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0
-                                                                                    ? 'bg-[#63A361] text-white'
-                                                                                    : 'bg-[#FDE7B3] text-[#5B532C]'
-                                                                                    }`}>
-                                                                                    {idx + 1}
-                                                                                </div>
-                                                                                <div>
-                                                                                    <h4 className="font-semibold text-[#5B532C]">{market.market}</h4>
-                                                                                    <p className="text-sm text-[#5B532C]/60">{market.state}</p>
-                                                                                </div>
+                                                            {distResult.recommendedMarkets.map((market, idx) => (
+                                                                <motion.div
+                                                                    key={idx}
+                                                                    initial={{ opacity: 0, x: -20 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    transition={{ delay: idx * 0.1 }}
+                                                                    className={`p-4 rounded-lg border-2 ${idx === 0
+                                                                        ? 'border-[#63A361] bg-[#63A361]/5'
+                                                                        : 'border-[#5B532C]/10'
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex items-start justify-between">
+                                                                        <div className="flex items-start gap-3">
+                                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0
+                                                                                ? 'bg-[#63A361] text-white'
+                                                                                : 'bg-[#FDE7B3] text-[#5B532C]'
+                                                                                }`}>
+                                                                                {idx + 1}
                                                                             </div>
-                                                                            {idx === 0 && (
-                                                                                <span className="text-xs bg-[#63A361] text-white px-2 py-0.5 rounded-full">Best Pick</span>
-                                                                            )}
-                                                                        </div>
-
-                                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                                                                            <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
-                                                                                <DollarSign className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
-                                                                                <p className="text-xs text-[#5B532C]/60">Price</p>
-                                                                                <p className="text-sm font-bold text-[#5B532C]">{market.price}</p>
-                                                                            </div>
-                                                                            <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
-                                                                                <MapPin className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
-                                                                                <p className="text-xs text-[#5B532C]/60">Distance</p>
-                                                                                <p className="text-sm font-bold text-[#5B532C]">{market.distance}</p>
-                                                                            </div>
-                                                                            <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
-                                                                                <ClockIcon className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
-                                                                                <p className="text-xs text-[#5B532C]/60">Transport</p>
-                                                                                <p className="text-sm font-bold text-[#5B532C]">{market.transportTime}</p>
-                                                                            </div>
-                                                                            <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
-                                                                                <TrendingUp className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
-                                                                                <p className="text-xs text-[#5B532C]/60">Net Revenue</p>
-                                                                                <p className="text-sm font-bold text-[#63A361]">{market.netRevenue}</p>
+                                                                            <div>
+                                                                                <h4 className="font-semibold text-[#5B532C]">{market.market}</h4>
+                                                                                <p className="text-sm text-[#5B532C]/60">{market.state}</p>
                                                                             </div>
                                                                         </div>
-
-                                                                        {market.spoilageRisk && (
-                                                                            <div className="mt-2 flex items-center gap-1.5">
-                                                                                <AlertTriangle className={`w-3.5 h-3.5 ${market.spoilageRisk === 'high' ? 'text-red-500' :
-                                                                                    market.spoilageRisk === 'medium' ? 'text-amber-500' : 'text-green-500'
-                                                                                    }`} />
-                                                                                <span className={`text-xs ${market.spoilageRisk === 'high' ? 'text-red-600' :
-                                                                                    market.spoilageRisk === 'medium' ? 'text-amber-600' : 'text-green-600'
-                                                                                    }`}>
-                                                                                    Spoilage risk: {market.spoilageRisk}
-                                                                                </span>
-                                                                            </div>
+                                                                        {idx === 0 && (
+                                                                            <span className="text-xs bg-[#63A361] text-white px-2 py-0.5 rounded-full">Best Pick</span>
                                                                         )}
-                                                                    </motion.div>
-                                                                ));
-                                                            })()}
-                                                        </div>
-                                                    </div>
+                                                                    </div>
 
-                                                    {/* Mark dispatched action */}
-                                                    <div className="mt-6 flex items-center gap-3">
-                                                        <button
-                                                            onClick={async () => {
-                                                                if (!selectedDistLot) return;
-                                                                try {
-                                                                    await warehouseService.updateLot(selectedDistLot._id, { status: 'dispatched' } as any);
-                                                                    setLots((prev) => prev.map((l) => (l._id === selectedDistLot._id ? { ...l, status: 'dispatched' as any } : l)));
-                                                                    toast.success('Lot marked as dispatched!');
-                                                                    setDistResult(null);
-                                                                } catch {
-                                                                    toast.error('Failed to update status');
-                                                                }
-                                                            }}
-                                                            className="flex-1 py-3 bg-[#63A361] hover:bg-[#63A361]/90 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                                        >
-                                                            <Truck className="w-4 h-4" />
-                                                            Mark as Dispatched
-                                                        </button>
+                                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                                                                        <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
+                                                                            <DollarSign className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
+                                                                            <p className="text-xs text-[#5B532C]/60">Price</p>
+                                                                            <p className="text-sm font-bold text-[#5B532C]">{market.price}</p>
+                                                                        </div>
+                                                                        <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
+                                                                            <MapPin className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
+                                                                            <p className="text-xs text-[#5B532C]/60">Distance</p>
+                                                                            <p className="text-sm font-bold text-[#5B532C]">{market.distance}</p>
+                                                                        </div>
+                                                                        <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
+                                                                            <ClockIcon className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
+                                                                            <p className="text-xs text-[#5B532C]/60">Transport</p>
+                                                                            <p className="text-sm font-bold text-[#5B532C]">{market.transportTime}</p>
+                                                                        </div>
+                                                                        <div className="text-center p-2 bg-white rounded-lg border border-[#5B532C]/5">
+                                                                            <TrendingUp className="w-4 h-4 text-[#63A361] mx-auto mb-1" />
+                                                                            <p className="text-xs text-[#5B532C]/60">Net Revenue</p>
+                                                                            <p className="text-sm font-bold text-[#63A361]">{market.netRevenue}</p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {market.spoilageRisk && (
+                                                                        <div className="mt-2 flex items-center gap-1.5">
+                                                                            <AlertTriangle className={`w-3.5 h-3.5 ${market.spoilageRisk === 'high' ? 'text-red-500' :
+                                                                                market.spoilageRisk === 'medium' ? 'text-amber-500' : 'text-green-500'
+                                                                                }`} />
+                                                                            <span className={`text-xs ${market.spoilageRisk === 'high' ? 'text-red-600' :
+                                                                                market.spoilageRisk === 'medium' ? 'text-amber-600' : 'text-green-600'
+                                                                                }`}>
+                                                                                Spoilage risk: {market.spoilageRisk}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </motion.div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </motion.div>
                                             )}
@@ -1235,7 +1101,6 @@ const Warehouse: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
                     </>
                 )}
             </div>
@@ -1419,7 +1284,33 @@ const Warehouse: React.FC = () => {
                 isOpen={timelineOpen}
                 onClose={() => setTimelineOpen(false)}
             />
-        </div >
+
+            {/* ─── Dispatch Decision Bar (from alert flow) ─── */}
+            {dispatchAlert && dispatchLotForAlert && (
+                <DispatchConfirmForm
+                    alert={dispatchAlert}
+                    lot={dispatchLotForAlert}
+                    isVisible={showDispatchBar}
+                    onDispatched={() => {
+                        setDispatchAlert(null);
+                        setDispatchLotForAlert(null);
+                        setShowDispatchBar(false);
+                        loadData(); // Reload all data to sync UI
+                    }}
+                    onDecideLater={async () => {
+                        if (dispatchAlert) {
+                            try { await warehouseService.markAlertRead(dispatchAlert._id); } catch { }
+                        }
+                        setShowDispatchBar(false);
+                    }}
+                    onClose={() => {
+                        setDispatchAlert(null);
+                        setDispatchLotForAlert(null);
+                        setShowDispatchBar(false);
+                    }}
+                />
+            )}
+        </div>
     );
 };
 

@@ -105,6 +105,14 @@ exports.update = async (req, res) => {
             });
         }
 
+        // On dispatch/sold: free up warehouse capacity
+        if (['dispatched', 'sold'].includes(req.body.status)) {
+            const warehouseId = typeof lot.warehouse === 'object' ? lot.warehouse._id : lot.warehouse;
+            await Warehouse.findByIdAndUpdate(warehouseId, {
+                $inc: { usedCapacity: -lot.quantityQuintals },
+            });
+        }
+
         res.json({ lot });
     } catch (err) {
         res.status(500).json({ error: 'Failed to update lot' });

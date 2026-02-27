@@ -133,9 +133,45 @@ export const warehouseService = {
         return res.data.alert;
     },
 
-    async resolveAlert(id: string): Promise<AlertData> {
-        const res = await api.put(`/alerts/${id}/resolve`);
+    async resolveAlert(id: string, actionTaken?: string): Promise<AlertData> {
+        const res = await api.put(`/alerts/${id}/resolve`, { actionTaken: actionTaken || '' });
         return res.data.alert;
+    },
+
+    /** Orchestrates dispatch: updates lot status → logs timeline event → resolves alert (if any) */
+    async dispatchLot(
+        lotId: string,
+        opts: {
+            quantityDispatched: number;
+            market: string;
+            pricePerQuintal?: number;
+            alertId?: string;
+        }
+    ): Promise<void> {
+        const { quantityDispatched, market, pricePerQuintal, alertId } = opts;
+
+        // 1. Mark lot as dispatched
+        await this.updateLot(lotId, { status: 'dispatched' });
+
+        // 2. Log traceability event
+        const revenue = pricePerQuintal
+            ? `₹${(quantityDispatched * pricePerQuintal).toLocaleString('en-IN')}`
+            : 'amount TBD';
+        const priceStr = pricePerQuintal ? ` at ₹${pricePerQuintal.toLocaleString('en-IN')}/q` : '';
+        await this.addLotEvent(lotId, {
+            eventType: 'dispatched',
+            description: `Dispatched ${quantityDispatched}q to ${market}${priceStr}. Est. revenue: ${revenue}`,
+            metadata: { market, quantityDispatched, pricePerQuintal, alertId },
+        });
+
+        // 3. Resolve the linked alert (non-blocking — dispatch already succeeded)
+        if (alertId) {
+            try {
+                await this.resolveAlert(alertId, `Dispatched ${quantityDispatched}q to ${market}`);
+            } catch (err) {
+                console.warn('Alert resolve failed (non-critical):', err);
+            }
+        }
     },
 };
 

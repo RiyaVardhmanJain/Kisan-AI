@@ -59,25 +59,17 @@ const checkAndFireAlerts = async ({ lot, warehouse, conditions, owner }) => {
         });
     }
 
-    // Check warehouse capacity overstocking
-    const usedPct = warehouse.capacityQuintals > 0
-        ? (warehouse.usedCapacity / warehouse.capacityQuintals) * 100
-        : 0;
-    if (usedPct > 90) {
-        alerts.push({
-            owner,
-            lot: lot._id,
-            warehouse: warehouse._id,
-            alertType: 'capacity_warning',
-            severity: usedPct >= 100 ? 'critical' : 'high',
-            message: `Warehouse "${warehouse.name}" is at ${usedPct.toFixed(0)}% capacity (${warehouse.usedCapacity}/${warehouse.capacityQuintals} qtl)`,
-            recommendation: 'Consider dispatching produce or using another warehouse to prevent overcrowding',
-        });
-    }
-
-    // Save all new alerts
+    // Deduplicate: only one active alert per (lot + alertType) at a time.
+    // A new alert of the same type only fires once the previous one is resolved.
     const savedAlerts = [];
     for (const alertData of alerts) {
+        const existing = await Alert.findOne({
+            lot: alertData.lot,
+            alertType: alertData.alertType,
+            isResolved: false,
+            owner: alertData.owner,
+        });
+        if (existing) continue; // Already active — skip duplicate
         const alert = await Alert.create(alertData);
         savedAlerts.push(alert);
     }
