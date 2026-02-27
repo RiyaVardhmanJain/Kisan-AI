@@ -308,6 +308,16 @@ const Warehouse: React.FC = () => {
         setShowDispatchBar(true);
     };
 
+    const handleSellDispatchStandalone = (lot: LotData) => {
+        setActiveTab('distribution');
+        setSelectedDistLot(lot);
+        setDispatchQty(String(lot.quantityQuintals));
+        setDistResult(null);
+        setDispatchAlert(null);
+        setDispatchLotForAlert(lot);
+        setShowDispatchBar(true);
+    };
+
     /* ─── Monitor tab: AI analysis ─── */
     const runAiAnalysis = async () => {
         if (sensorData.length === 0) {
@@ -601,6 +611,7 @@ const Warehouse: React.FC = () => {
                                                     key={lot._id}
                                                     lot={lot}
                                                     onViewTimeline={handleViewTimeline}
+                                                    onSellDispatch={handleSellDispatchStandalone}
                                                 />
                                             ))}
                                         </div>
@@ -1093,6 +1104,20 @@ const Warehouse: React.FC = () => {
                                                                 </motion.div>
                                                             ))}
                                                         </div>
+
+                                                        {/* Standalone Dispatch Button */}
+                                                        <div className="mt-6 flex justify-end">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setDispatchLotForAlert(selectedDistLot);
+                                                                    setShowDispatchBar(true);
+                                                                }}
+                                                                className="flex items-center gap-2 px-6 py-3 bg-[#63A361] hover:bg-[#578f55] text-white rounded-xl font-bold shadow-lg shadow-green-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                                            >
+                                                                <Truck className="w-5 h-5" />
+                                                                Proceed to Dispatch
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </motion.div>
                                             )}
@@ -1285,8 +1310,8 @@ const Warehouse: React.FC = () => {
                 onClose={() => setTimelineOpen(false)}
             />
 
-            {/* ─── Dispatch Decision Bar (from alert flow) ─── */}
-            {dispatchAlert && dispatchLotForAlert && (
+            {/* ─── Dispatch Decision Bar (Standalone or from alert flow) ─── */}
+            {dispatchLotForAlert && (
                 <DispatchConfirmForm
                     alert={dispatchAlert}
                     lot={dispatchLotForAlert}

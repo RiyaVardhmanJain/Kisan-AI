@@ -82,15 +82,19 @@ exports.create = async (req, res) => {
 // PUT /api/lots/:id
 exports.update = async (req, res) => {
     try {
+        // Fetch old lot BEFORE update to compute quantity delta
+        const oldLot = await ProduceLot.findOne({ _id: req.params.id, owner: req.user._id });
+        if (!oldLot) {
+            return res.status(404).json({ error: 'Lot not found' });
+        }
+        const oldQty = oldLot.quantityQuintals;
+
+        // Apply update
         const lot = await ProduceLot.findOneAndUpdate(
             { _id: req.params.id, owner: req.user._id },
             req.body,
             { new: true, runValidators: true }
         );
-
-        if (!lot) {
-            return res.status(404).json({ error: 'Lot not found' });
-        }
 
         // Log condition/status changes as events
         if (req.body.currentCondition || req.body.status) {
@@ -105,17 +109,21 @@ exports.update = async (req, res) => {
             });
         }
 
-        // On dispatch/sold: free up warehouse capacity
-        if (['dispatched', 'sold'].includes(req.body.status)) {
-            const warehouseId = typeof lot.warehouse === 'object' ? lot.warehouse._id : lot.warehouse;
-            await Warehouse.findByIdAndUpdate(warehouseId, {
-                $inc: { usedCapacity: -lot.quantityQuintals },
-            });
+        // Free up warehouse capacity by the ACTUAL dispatched amount
+        if (['dispatched', 'sold', 'partially_dispatched'].includes(req.body.status)) {
+            const dispatchedQty = oldQty - lot.quantityQuintals; // e.g. 80 - 50 = 30q dispatched
+            if (dispatchedQty > 0) {
+                const warehouseId = typeof lot.warehouse === 'object' ? lot.warehouse._id : lot.warehouse;
+                await Warehouse.findByIdAndUpdate(warehouseId, {
+                    $inc: { usedCapacity: -dispatchedQty },
+                });
+            }
         }
 
         res.json({ lot });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to update lot' });
+        console.error('❌ Lot update error:', err.message, err);
+        res.status(500).json({ error: 'Failed to update lot', details: err.message });
     }
 };
 
