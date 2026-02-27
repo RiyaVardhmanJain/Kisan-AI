@@ -1,7 +1,7 @@
 // Translation types removed - using direct text instead
 
 // Monitoring Types
-export type MonitoringType = 'crop' | 'soil' | 'thermal' | 'field';
+export type MonitoringType = 'crop' | 'storage' | 'thermal' | 'field';
 
 export interface EnvironmentalFactor {
   factor: string;
@@ -30,24 +30,18 @@ export interface CropMonitoringResult {
   analysisSummary: string;
 }
 
-// Soil Monitoring Result
-export interface SoilMonitoringResult {
-  soilType: string;
-  texture: 'fine' | 'medium' | 'coarse';
-  colorDescription: string;
-  moistureLevel: 'low' | 'medium' | 'high';
-  fertilityEstimate: 'low' | 'medium' | 'high';
-  erosionRisk: 'low' | 'medium' | 'high';
-  salinityIssue: 'none' | 'suspected' | 'evident';
-  compositionNotes: string;
+// Storage/Warehouse Monitoring Result
+export interface StorageMonitoringResult {
+  produceCondition: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  moldDetected: 'none' | 'suspected' | 'confirmed';
+  moistureDamage: 'none' | 'mild' | 'moderate' | 'severe';
+  pestSigns: 'none' | 'suspected' | 'confirmed';
+  ventilationStatus: 'adequate' | 'insufficient' | 'poor';
+  storageRisk: 'low' | 'medium' | 'high' | 'critical';
+  shelfLifeEstimate: string;
   environmentalFactors: EnvironmentalFactor[];
-  realTimeMetrics: {
-    moisturePercentage: number;
-    organicMatterIndicator: number;
-    pHEstimate: number;
-  };
-  improvementSuggestions: string[];
-  preventionMeasures: string[];
+  recommendations: string[];
+  preventiveMeasures: string[];
   confidenceLevel: number;
   analysisSummary: string;
 }
@@ -95,8 +89,8 @@ export interface FieldMonitoringResult {
 }
 
 // Union type for all monitoring results
-export type MonitoringResult = 
-  | CropMonitoringResult 
-  | SoilMonitoringResult 
-  | ThermalMonitoringResult 
+export type MonitoringResult =
+  | CropMonitoringResult
+  | StorageMonitoringResult
+  | ThermalMonitoringResult
   | FieldMonitoringResult;

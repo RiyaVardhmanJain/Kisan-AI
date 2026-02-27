@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Leaf, Mountain, Thermometer, Plane, Loader, Camera, Sparkles } from 'lucide-react';
+import { Upload, Leaf, Warehouse, Thermometer, Plane, Loader, Camera, Sparkles } from 'lucide-react';
 
 // Simple cn utility
 const cn = (...classes: (string | boolean | undefined)[]) => classes.filter(Boolean).join(' ');
-import { 
-  analyzeCropImage, 
-  analyzeSoilImage, 
-  analyzeThermalImage, 
+import {
+  analyzeCropImage,
+  analyzeStorageImage,
+  analyzeThermalImage,
   analyzeFieldImage,
   isValidImage
 } from '../ai/monitoringService';
-import { MonitoringType, CropMonitoringResult, SoilMonitoringResult, ThermalMonitoringResult, FieldMonitoringResult } from '../types';
+import { MonitoringType, CropMonitoringResult, StorageMonitoringResult, ThermalMonitoringResult, FieldMonitoringResult } from '../types';
 import { InvalidImageResult } from '../components/monitoring/InvalidImageResult';
 import { CropMonitoringResult as CropMonitoringResultComponent } from '../components/monitoring/CropMonitoringResult';
-import { SoilMonitoringResult as SoilMonitoringResultComponent } from '../components/monitoring/SoilMonitoringResult';
+import { StorageMonitoringResult as StorageMonitoringResultComponent } from '../components/monitoring/StorageMonitoringResult';
 import { ThermalMonitoringResult as ThermalMonitoringResultComponent } from '../components/monitoring/ThermalMonitoringResult';
 import { FieldMonitoringResult as FieldMonitoringResultComponent } from '../components/monitoring/FieldMonitoringResult';
 import toast, { Toaster } from 'react-hot-toast';
@@ -34,10 +34,10 @@ const MONITORING_TYPES = [
     borderColor: 'border-[#63A361]/20',
   },
   {
-    type: 'soil' as MonitoringType,
-    icon: Mountain,
-    title: 'Soil Image',
-    description: 'Analyze soil moisture, fertility, and composition',
+    type: 'storage' as MonitoringType,
+    icon: Warehouse,
+    title: 'Storage Detection',
+    description: 'Detect mold, pests, moisture damage in stored produce',
     color: 'consult-yellow',
     bgGradient: 'from-[#FDE7B3]/20 to-[#FFC50F]/10',
     iconColor: 'text-[#FFC50F]',
@@ -69,7 +69,7 @@ const Monitoring: React.FC = () => {
   const [selectedType, setSelectedType] = useState<MonitoringType | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<CropMonitoringResult | SoilMonitoringResult | ThermalMonitoringResult | FieldMonitoringResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<CropMonitoringResult | StorageMonitoringResult | ThermalMonitoringResult | FieldMonitoringResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [processingSteps, setProcessingSteps] = useState<string[]>([]);
@@ -137,14 +137,14 @@ const Monitoring: React.FC = () => {
         await new Promise((r) => setTimeout(r, step.duration));
       }
 
-      let result: CropMonitoringResult | SoilMonitoringResult | ThermalMonitoringResult | FieldMonitoringResult;
+      let result: CropMonitoringResult | StorageMonitoringResult | ThermalMonitoringResult | FieldMonitoringResult;
 
       switch (type) {
         case 'crop':
           result = await analyzeCropImage(imageData);
           break;
-        case 'soil':
-          result = await analyzeSoilImage(imageData);
+        case 'storage':
+          result = await analyzeStorageImage(imageData);
           break;
         case 'thermal':
           result = await analyzeThermalImage(imageData);
@@ -158,7 +158,7 @@ const Monitoring: React.FC = () => {
 
       addProcessingStep('Analysis complete!');
       setAnalysisResult(result);
-      
+
       if (!isValidImage(result)) {
         toast.error('Invalid image detected');
       } else {
@@ -193,7 +193,7 @@ const Monitoring: React.FC = () => {
   return (
     <div className="min-h-screen bg-white py-12 px-4">
       <Toaster position="top-right" />
-      
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div
@@ -230,19 +230,19 @@ const Monitoring: React.FC = () => {
                     <p className="text-sm text-[#5B532C]/60">Start by uploading an image for AI analysis</p>
                   </div>
                 </div>
-                
+
                 {/* Drop Zone */}
-              <div {...getRootProps()}>
-                <input {...getInputProps()} />
-                <div
+                <div {...getRootProps()}>
+                  <input {...getInputProps()} />
+                  <div
                     className={cn(
                       "p-10 rounded-xl border-2 border-dashed cursor-pointer transition-colors",
-                    isDragActive
+                      isDragActive
                         ? "border-[#63A361] bg-[#63A361]/5"
                         : "border-[#5B532C]/20 bg-[#FDE7B3]/10"
                     )}
-                >
-                  <div className="text-center">
+                  >
+                    <div className="text-center">
                       <div className={cn(
                         "w-16 h-16 mx-auto mb-4 rounded-xl flex items-center justify-center",
                         isDragActive ? "bg-[#63A361]" : "bg-[#63A361]/10"
@@ -251,10 +251,10 @@ const Monitoring: React.FC = () => {
                       </div>
                       <h3 className="text-lg font-bold text-[#5B532C] mb-2">
                         {isDragActive ? "Drop your image here" : "Upload Image for Monitoring"}
-                    </h3>
+                      </h3>
                       <p className="text-[#5B532C]/60 mb-4 text-sm">
-                      Drag & drop your image here, or click to browse
-                    </p>
+                        Drag & drop your image here, or click to browse
+                      </p>
                       <div className="flex items-center justify-center gap-2 flex-wrap">
                         {["JPEG", "PNG", "WebP"].map((format) => (
                           <span key={format} className="px-2 py-1 rounded text-xs font-medium bg-[#5B532C]/10 text-[#5B532C]">
@@ -282,16 +282,16 @@ const Monitoring: React.FC = () => {
                       <div className={cn(
                         "w-12 h-12 mx-auto mb-3 rounded-xl flex items-center justify-center",
                         type.type === 'crop' ? "bg-[#63A361]/10" :
-                        type.type === 'soil' ? "bg-[#FFC50F]/10" :
-                        type.type === 'thermal' ? "bg-red-100" :
-                        "bg-blue-100"
+                          type.type === 'storage' ? "bg-[#FFC50F]/10" :
+                            type.type === 'thermal' ? "bg-red-100" :
+                              "bg-blue-100"
                       )}>
                         <type.icon className={cn(
                           "w-6 h-6",
                           type.type === 'crop' ? "text-[#63A361]" :
-                          type.type === 'soil' ? "text-[#FFC50F]" :
-                          type.type === 'thermal' ? "text-red-500" :
-                          "text-blue-500"
+                            type.type === 'storage' ? "text-[#FFC50F]" :
+                              type.type === 'thermal' ? "text-red-500" :
+                                "text-blue-500"
                         )} />
                       </div>
                       <h4 className="font-semibold text-[#5B532C] mb-1 text-sm">{type.title}</h4>
@@ -308,12 +308,12 @@ const Monitoring: React.FC = () => {
                   <h3 className="text-center text-lg font-semibold text-[#5B532C] mb-6">
                     AI-Powered Insights Await
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     {[
                       { title: "Health Analysis", desc: "Disease detection & severity assessment", IconComp: Leaf },
-                      { title: "Recommendations", desc: "Treatment plans & preventive measures", IconComp: Sparkles },
-                      { title: "Visual Reports", desc: "Charts, metrics & confidence scores", IconComp: Mountain }
+                      { title: "Recommendations", desc: "Storage improvements & preventive measures", IconComp: Sparkles },
+                      { title: "Visual Reports", desc: "Charts, metrics & confidence scores", IconComp: Warehouse }
                     ].map((item, i) => (
                       <div
                         key={i}
@@ -360,7 +360,7 @@ const Monitoring: React.FC = () => {
                     <div className="p-4 rounded-xl bg-white border border-[#5B532C]/10">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-8 h-8 rounded-lg bg-[#FFC50F]/10 flex items-center justify-center">
-                          <Mountain className="w-4 h-4 text-[#FFC50F]" />
+                          <Warehouse className="w-4 h-4 text-[#FFC50F]" />
                         </div>
                         <span className="font-semibold text-[#5B532C]">Detection Results</span>
                       </div>
@@ -391,12 +391,12 @@ const Monitoring: React.FC = () => {
               <div className="p-8 bg-white rounded-2xl border border-[#5B532C]/10">
                 {/* Image Preview Section */}
                 <div className="flex flex-col md:flex-row gap-8 items-center mb-8 pb-8 border-b border-[#5B532C]/10">
-                <img
-                  src={image}
-                  alt="Uploaded"
+                  <img
+                    src={image}
+                    alt="Uploaded"
                     className="w-40 h-40 object-cover rounded-xl border border-[#5B532C]/10"
                   />
-                  
+
                   <div className="flex-1 text-center md:text-left">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#63A361]/10 text-[#63A361] text-sm font-medium mb-3">
                       <span className="w-2 h-2 rounded-full bg-[#63A361]" />
@@ -405,37 +405,37 @@ const Monitoring: React.FC = () => {
                     <h2 className="text-xl font-bold text-[#5B532C] mb-2">Choose Analysis Type</h2>
                     <p className="text-[#5B532C]/60 mb-4 text-sm">Select the type of monitoring for your image</p>
                     <button
-                  onClick={resetAnalysis}
+                      onClick={resetAnalysis}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[#5B532C] border border-[#5B532C]/20 bg-white"
                     >
                       <Upload className="w-4 h-4" />
                       Change Image
                     </button>
                   </div>
-              </div>
+                </div>
 
                 {/* Type Selection Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {MONITORING_TYPES.map((type) => (
+                  {MONITORING_TYPES.map((type) => (
                     <button
-                    key={type.type}
-                    onClick={() => handleTypeSelection(type.type)}
-                    disabled={isAnalyzing}
+                      key={type.type}
+                      onClick={() => handleTypeSelection(type.type)}
+                      disabled={isAnalyzing}
                       className="p-5 rounded-xl border-2 border-[#5B532C]/10 bg-white text-center transition-colors hover:border-[#63A361] hover:bg-[#63A361]/5"
                     >
                       <div className={cn(
                         "w-12 h-12 mx-auto mb-3 rounded-xl flex items-center justify-center",
                         type.type === 'crop' ? "bg-[#63A361]/10" :
-                        type.type === 'soil' ? "bg-[#FFC50F]/10" :
-                        type.type === 'thermal' ? "bg-red-100" :
-                        "bg-blue-100"
+                          type.type === 'storage' ? "bg-[#FFC50F]/10" :
+                            type.type === 'thermal' ? "bg-red-100" :
+                              "bg-blue-100"
                       )}>
                         <type.icon className={cn(
                           "w-6 h-6",
                           type.type === 'crop' ? "text-[#63A361]" :
-                          type.type === 'soil' ? "text-[#FFC50F]" :
-                          type.type === 'thermal' ? "text-red-500" :
-                          "text-blue-500"
+                            type.type === 'storage' ? "text-[#FFC50F]" :
+                              type.type === 'thermal' ? "text-red-500" :
+                                "text-blue-500"
                         )} />
                       </div>
                       <h3 className="font-semibold text-[#5B532C] mb-1">{type.title}</h3>
@@ -456,7 +456,7 @@ const Monitoring: React.FC = () => {
               exit={{ opacity: 0 }}
               className="max-w-2xl mx-auto"
             >
-                  <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#63A361]/20">
+              <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#63A361]/20">
                 <div className="text-center mb-8">
                   <Loader className="w-16 h-16 mx-auto mb-4 text-[#63A361] animate-spin" />
                   <h3 className="text-2xl font-semibold text-[#5B532C] mb-2">
@@ -476,20 +476,18 @@ const Monitoring: React.FC = () => {
                       className="flex items-center gap-3 p-3 bg-[#FDE7B3]/10 rounded-lg border border-[#63A361]/10"
                     >
                       <div
-                        className={`w-2 h-2 rounded-full ${
-                          index === currentStep
+                        className={`w-2 h-2 rounded-full ${index === currentStep
                             ? 'bg-[#63A361] animate-pulse'
                             : index < currentStep
-                            ? 'bg-[#63A361]'
-                            : 'bg-gray-300'
-                        }`}
+                              ? 'bg-[#63A361]'
+                              : 'bg-gray-300'
+                          }`}
                       />
                       <span
-                        className={`text-sm ${
-                          index <= currentStep
+                        className={`text-sm ${index <= currentStep
                             ? 'text-[#5B532C] font-medium'
                             : 'text-[#5B532C]/40'
-                        }`}
+                          }`}
                       >
                         {step}
                       </span>
@@ -517,9 +515,9 @@ const Monitoring: React.FC = () => {
                       onRetry={resetAnalysis}
                     />
                   )}
-                  {selectedType === 'soil' && (
-                    <SoilMonitoringResultComponent
-                      result={analysisResult as SoilMonitoringResult}
+                  {selectedType === 'storage' && (
+                    <StorageMonitoringResultComponent
+                      result={analysisResult as StorageMonitoringResult}
                       image={image}
                       onRetry={resetAnalysis}
                     />

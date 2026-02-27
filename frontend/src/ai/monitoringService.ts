@@ -1,17 +1,17 @@
 import axios from 'axios';
 import {
   getCropMonitoringPrompt,
-  getSoilMonitoringPrompt,
+  getStorageMonitoringPrompt,
   getThermalMonitoringPrompt,
   getFieldMonitoringPrompt,
   CropMonitoringPromptConfig,
-  SoilMonitoringPromptConfig,
+  StorageMonitoringPromptConfig,
   ThermalMonitoringPromptConfig,
   FieldMonitoringPromptConfig
 } from './monitoringPrompt';
 import {
   CropMonitoringResult,
-  SoilMonitoringResult,
+  StorageMonitoringResult,
   ThermalMonitoringResult,
   FieldMonitoringResult
 } from '../types';
@@ -148,14 +148,14 @@ export async function analyzeCropImage(
 }
 
 /**
- * Analyzes a soil image using Gemini API
+ * Analyzes a warehouse/storage image using Gemini API
  */
-export async function analyzeSoilImage(
+export async function analyzeStorageImage(
   imageData: string,
-  config?: SoilMonitoringPromptConfig
-): Promise<SoilMonitoringResult> {
+  config?: StorageMonitoringPromptConfig
+): Promise<StorageMonitoringResult> {
   try {
-    const prompt = getSoilMonitoringPrompt(config);
+    const prompt = getStorageMonitoringPrompt(config);
     const base64Image = imageData.split(',')[1] || imageData;
 
     const response = await callGeminiAPI({
@@ -183,18 +183,18 @@ export async function analyzeSoilImage(
     const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('No response from AI model');
 
-    const result = cleanAndParseJSON<SoilMonitoringResult>(text);
+    const result = cleanAndParseJSON<StorageMonitoringResult>(text);
 
     // Validation for invalid images
-    if (result.confidenceLevel === 0 || result.soilType === 'Not Applicable') {
+    if (result.confidenceLevel === 0 || result.produceCondition === 'Not Applicable' as any) {
       return result;
     }
 
     return result;
   } catch (error) {
-    console.error('Soil analysis error:', error);
+    console.error('Storage analysis error:', error);
     throw new Error(
-      `Failed to analyze soil image: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to analyze storage image: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }
