@@ -61,6 +61,108 @@ interface CropWeatherImpact {
   };
 }
 
+// Storage-specific weather impacts for post-harvest produce
+interface StorageWeatherImpact {
+  [produce: string]: {
+    humidityEffect: string;
+    temperatureEffect: string;
+    precipitationEffect: string;
+  };
+}
+
+const STORAGE_WEATHER_IMPACTS: StorageWeatherImpact = {
+  'Onion': {
+    humidityEffect: "Stored onions at elevated spoilage risk — humidity accelerates rot",
+    temperatureEffect: "Temperature spike reduces shelf life of stored onions",
+    precipitationEffect: "Transport window closing — dispatch onions before rain"
+  },
+  'Potato': {
+    humidityEffect: "Stored potatoes at elevated spoilage risk — sprouting accelerated",
+    temperatureEffect: "Cold storage units may need extra cooling for potato preservation",
+    precipitationEffect: "Transport window closing — dispatch potatoes before rain"
+  },
+  'Wheat': {
+    humidityEffect: "Grain moisture absorption risk — check storage ventilation immediately",
+    temperatureEffect: "Insect activity increases in stored wheat above 30°C",
+    precipitationEffect: "Ensure godown roof integrity — rain ingress damages grain"
+  },
+  'Rice': {
+    humidityEffect: "Stored rice vulnerable to fungal growth in high humidity",
+    temperatureEffect: "Cold storage units may need extra cooling to prevent yellowing",
+    precipitationEffect: "Transport delays likely — plan dispatch accordingly"
+  },
+  'Tomato': {
+    humidityEffect: "Stored tomatoes at high mold risk in humid conditions",
+    temperatureEffect: "Ripening accelerated — dispatch immediately or lower temperature",
+    precipitationEffect: "Transport window closing — dispatch perishables before rain"
+  },
+  'Cotton': {
+    humidityEffect: "Cotton bales absorbing moisture — check warehouse dehumidifiers",
+    temperatureEffect: "Minimal temperature impact on stored cotton",
+    precipitationEffect: "Ensure covered transport for cotton bales"
+  }
+};
+
+export interface StorageRiskAnalysis {
+  produce: string;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  risks: string[];
+  recommendation: string;
+  dispatchUrgency: 'low' | 'medium' | 'high';
+}
+
+/**
+ * Analyze weather impact on stored produce
+ */
+export const analyzeStorageImpact = (weatherData: WeatherData, crop: string): StorageRiskAnalysis => {
+  const { temp, humidity } = weatherData.main;
+  const weatherDesc = weatherData.weather[0]?.description?.toLowerCase() || '';
+
+  const impact = STORAGE_WEATHER_IMPACTS[crop];
+  const risks: string[] = [];
+  let riskLevel: 'Low' | 'Medium' | 'High' = 'Low';
+  let dispatchUrgency: 'low' | 'medium' | 'high' = 'low';
+
+  if (humidity > 75) {
+    risks.push(impact?.humidityEffect || `High humidity (${humidity}%) threatens stored ${crop}`);
+    riskLevel = 'High';
+    dispatchUrgency = 'high';
+  } else if (humidity > 60) {
+    risks.push(`Moderate humidity (${humidity}%) — monitor stored ${crop}`);
+    if (riskLevel === 'Low') riskLevel = 'Medium';
+    if (dispatchUrgency === 'low') dispatchUrgency = 'medium';
+  }
+
+  if (temp > 30) {
+    risks.push(impact?.temperatureEffect || `Temperature spike (${temp}°C) may need extra cooling`);
+    if (riskLevel !== 'High') riskLevel = 'Medium';
+    if (dispatchUrgency === 'low') dispatchUrgency = 'medium';
+  } else if (temp > 35) {
+    riskLevel = 'High';
+    dispatchUrgency = 'high';
+  }
+
+  if (weatherDesc.includes('rain') || weatherDesc.includes('storm') || weatherDesc.includes('drizzle')) {
+    risks.push(impact?.precipitationEffect || `Rain expected — plan dispatch of ${crop} accordingly`);
+    if (dispatchUrgency === 'low') dispatchUrgency = 'medium';
+  }
+
+  if (risks.length === 0) {
+    risks.push(`Current conditions are favorable for storing ${crop}`);
+  }
+
+  let recommendation = '';
+  if (riskLevel === 'High') {
+    recommendation = `Urgent: Dispatch ${crop} or activate emergency storage measures immediately.`;
+  } else if (riskLevel === 'Medium') {
+    recommendation = `Monitor ${crop} storage closely and prepare for potential dispatch.`;
+  } else {
+    recommendation = `Storage conditions are safe for ${crop}. Continue routine monitoring.`;
+  }
+
+  return { produce: crop, riskLevel, risks, recommendation, dispatchUrgency };
+};
+
 const CROP_WEATHER_IMPACTS: CropWeatherImpact = {
   'Wheat': {
     temperatureEffect: "Cool weather generally good for wheat growth",
@@ -114,7 +216,7 @@ export interface CropAnalysis {
 export const auditMarketWithWeather = async (
   marketData: MarketData, 
   city: string
-): Promise<{ cropAnalyses: CropAnalysis[]; weatherData: WeatherData; overallAnalysis: string }> => {
+): Promise<{ cropAnalyses: CropAnalysis[]; weatherData: WeatherData; overallAnalysis: string; storageRisks: StorageRiskAnalysis[] }> => {
   // Fetch current weather data for the city
   const weatherData = await fetchWeatherData(city);
   
@@ -127,10 +229,14 @@ export const auditMarketWithWeather = async (
   // Create overall analysis
   const overallAnalysis = createOverallAnalysis(weatherData, cropAnalyses);
   
+  // Analyze storage risks for top crops
+  const storageRisks = topCrops.map(crop => analyzeStorageImpact(weatherData, crop));
+
   return {
     cropAnalyses,
     weatherData,
-    overallAnalysis
+    overallAnalysis,
+    storageRisks
   };
 };
 

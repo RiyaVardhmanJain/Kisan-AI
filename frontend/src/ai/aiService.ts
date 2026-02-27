@@ -36,12 +36,13 @@ export const getAIResponse = async (
     userInput,
     userLanguage: context.userLanguage || "en",
     userLocation: context.userLocation,
+    dbContext: context.dbContext,
     previousMessages: context.previousMessages || []
   };
 
   const fullPrompt = getAIPrompt(fullContext);
   const [systemPrompt, userMessage] = fullPrompt.split('USER QUERY:');
-  
+
   const messages: GroqMessage[] = [
     {
       role: "system",
@@ -102,13 +103,13 @@ export const getAIResponse = async (
         }
         return { visible, thinking };
       };
-      
+
       try {
         // No initial delay for fastest start
         // (was 500ms)
-      for await (const chunk of stream) {
+        for await (const chunk of stream) {
           if (activeCancelled) break;
-        const content = chunk.choices[0]?.delta?.content || "";
+          const content = chunk.choices[0]?.delta?.content || "";
           const { visible, thinking } = processChunk(content);
           if (visible) accumulatedResponse += visible;
           if (thinking) accumulatedThinking += thinking;

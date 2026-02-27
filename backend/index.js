@@ -7,6 +7,7 @@ const authRoutes = require('./routes/authRoutes');
 const warehouseRoutes = require('./routes/warehouseRoutes');
 const lotRoutes = require('./routes/lotRoutes');
 const alertRoutes = require('./routes/alertRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/lots', lotRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

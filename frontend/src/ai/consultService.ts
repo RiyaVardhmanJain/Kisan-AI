@@ -29,6 +29,16 @@ export interface ConsultAnalysisResponse {
     nextPhase: string;
     daysToNextPhase: number;
   };
+  storageStrategy: {
+    method: string;
+    duration: string;
+    optimalTemp: string;
+    optimalHumidity: string;
+    costPerQuintal: string;
+    priceAdvantage: string;
+    spoilageRisk: string;
+    emergencyActions: string[];
+  };
   yieldForecast: {
     expectedYieldPerAcre: string;
     totalYieldForecast: string;
@@ -167,7 +177,7 @@ export async function getConsultAnalysis(input: ConsultAnalysisInput): Promise<C
       ],
       model: "moonshotai/kimi-k2-instruct-0905", // Using correct Kimi K2 model from smart farming
       temperature: 0.1, // Lower temperature for more consistent results
-      max_tokens: 1500, // Reduced for faster response while maintaining quality
+      max_tokens: 2000, // Expanded to accommodate storage strategy section
       top_p: 0.9,
     });
 

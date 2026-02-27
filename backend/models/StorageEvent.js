@@ -13,6 +13,7 @@ const storageEventSchema = new mongoose.Schema({
             'partially_dispatched',
             'dispatched',
             'sold',
+            'lot_deleted',
         ],
         required: true,
     },
