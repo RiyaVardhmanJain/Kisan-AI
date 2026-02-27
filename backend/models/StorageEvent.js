@@ -7,6 +7,8 @@ const storageEventSchema = new mongoose.Schema({
         type: String,
         enum: [
             'lot_created',
+            'lot_shifted',
+            'lot_merged',
             'inspection_done',
             'alert_fired',
             'condition_updated',
