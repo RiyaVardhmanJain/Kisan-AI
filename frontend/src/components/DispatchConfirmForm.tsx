@@ -6,11 +6,11 @@ import warehouseService from '../services/warehouseService';
 import type { AlertData, LotData } from '../services/warehouseService';
 
 interface DispatchConfirmFormProps {
-    alert: AlertData;
+    alert?: AlertData | null;   // Optional — absent when farmer dispatches without an alert
     lot: LotData;
     isVisible: boolean;
-    onDispatched: () => void;   // Called after successful dispatch — parent reloads data
-    onDecideLater: () => void;  // Marks alert as read, hides bar until next visit
+    onDispatched: () => void;
+    onDecideLater?: () => void; // Only relevant when alert-driven
     onClose: () => void;
 }
 
@@ -51,8 +51,13 @@ export const DispatchConfirmForm: React.FC<DispatchConfirmFormProps> = ({
 
         setDispatching(true);
         try {
-            // Step 1: Update lot status
-            await warehouseService.updateLot(lot._id, { status: 'dispatched' });
+            // Step 1: Update lot status + remaining quantity
+            const remaining = lot.quantityQuintals - qtyNum;
+            const newStatus = remaining <= 0 ? 'dispatched' : 'partially_dispatched';
+            await warehouseService.updateLot(lot._id, {
+                status: newStatus,
+                quantityQuintals: Math.max(0, remaining),
+            });
 
             // Step 2: Log traceability event
             const pricePerQ = price ? parseFloat(price) : undefined;
@@ -63,14 +68,16 @@ export const DispatchConfirmForm: React.FC<DispatchConfirmFormProps> = ({
             await warehouseService.addLotEvent(lot._id, {
                 eventType: 'dispatched',
                 description: `Dispatched ${qtyNum}q to ${market.trim()}${priceStr}. Est. revenue: ${revenueStr}`,
-                metadata: { market: market.trim(), quantityDispatched: qtyNum, pricePerQuintal: pricePerQ, alertId: alert._id },
+                metadata: { market: market.trim(), quantityDispatched: qtyNum, pricePerQuintal: pricePerQ, alertId: alert?._id },
             });
 
-            // Step 3: Resolve alert (non-blocking — don't fail the whole flow if this errors)
-            try {
-                await warehouseService.resolveAlert(alert._id, `Dispatched ${qtyNum}q to ${market.trim()}`);
-            } catch (alertErr) {
-                console.warn('Alert resolve failed (non-critical):', alertErr);
+            // Step 3: Resolve alert if present (non-blocking)
+            if (alert?._id) {
+                try {
+                    await warehouseService.resolveAlert(alert._id, `Dispatched ${qtyNum}q to ${market.trim()}`);
+                } catch (alertErr) {
+                    console.warn('Alert resolve failed (non-critical):', alertErr);
+                }
             }
 
             const toastRevenue = pricePerQ
@@ -78,9 +85,10 @@ export const DispatchConfirmForm: React.FC<DispatchConfirmFormProps> = ({
                 : '';
             toast.success(`✅ Dispatched ${qtyNum}q ${lot.cropName} to ${market.trim()}${toastRevenue}`);
             onDispatched();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Dispatch error:', err);
-            toast.error('Failed to dispatch. Please try again.');
+            const detail = err?.response?.data?.details || err?.response?.data?.error || err?.message || '';
+            toast.error(`Failed to dispatch: ${detail}`);
         } finally {
             setDispatching(false);
         }
@@ -235,21 +243,23 @@ export const DispatchConfirmForm: React.FC<DispatchConfirmFormProps> = ({
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium text-[#5B532C] truncate">
-                                            Alert Action · {lot.cropName} ({lot.lotId})
+                                            {alert ? 'Alert Action' : 'Dispatch Action'} · {lot.cropName} ({lot.lotId})
                                         </p>
                                         <p className="text-xs text-[#5B532C]/50">
-                                            You reviewed market options. What did you decide?
+                                            {alert ? 'You reviewed market options. What did you decide?' : 'Ready to record your dispatch details?'}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                    <button
-                                        onClick={onDecideLater}
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#5B532C]/15 text-[#5B532C]/60 text-sm hover:bg-gray-50 transition-colors"
-                                    >
-                                        <Clock className="w-3.5 h-3.5" />
-                                        Decide Later
-                                    </button>
+                                    {alert && (
+                                        <button
+                                            onClick={onDecideLater}
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#5B532C]/15 text-[#5B532C]/60 text-sm hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Clock className="w-3.5 h-3.5" />
+                                            Decide Later
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setShowForm(true)}
                                         className="flex items-center gap-1.5 px-4 py-2 bg-[#63A361] hover:bg-[#578f55] text-white rounded-lg text-sm font-semibold transition-colors"

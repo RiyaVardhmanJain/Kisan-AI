@@ -5,7 +5,7 @@ const produceLotSchema = new mongoose.Schema({
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     warehouse: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
     cropName: { type: String, required: true, trim: true },
-    quantityQuintals: { type: Number, required: true, min: 0.1 },
+    quantityQuintals: { type: Number, required: true, min: 0 },
     entryDate: { type: Date, default: Date.now },
     expectedShelfLifeDays: { type: Number },
     recommendedSellByDate: { type: Date },
