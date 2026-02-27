@@ -58,9 +58,17 @@ const checkAndFireAlerts = async ({ lot, warehouse, conditions, owner }) => {
         });
     }
 
-    // Save all new alerts
+    // Deduplicate: only one active alert per (lot + alertType) at a time.
+    // A new alert of the same type only fires once the previous one is resolved.
     const savedAlerts = [];
     for (const alertData of alerts) {
+        const existing = await Alert.findOne({
+            lot: alertData.lot,
+            alertType: alertData.alertType,
+            isResolved: false,
+            owner: alertData.owner,
+        });
+        if (existing) continue; // Already active — skip duplicate
         const alert = await Alert.create(alertData);
         savedAlerts.push(alert);
     }
