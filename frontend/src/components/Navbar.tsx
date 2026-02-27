@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Menu, X, BarChart3, Sprout, Eye, Tractor } from 'lucide-react';
+import { NavLink, Link } from 'react-router-dom';
+import { Menu, X, BarChart3, Sprout, Eye, Warehouse, LogOut, UserCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../utils/cn';
 import { LuBug } from "react-icons/lu";
+import { useAuth } from '../context/AuthContext';
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
+
   const navItems = [
+    { path: '/warehouse', icon: Warehouse, label: 'My Storage' },
     { path: '/consult', icon: Eye, label: 'E-Consult' },
     { path: '/monitor', icon: LuBug, label: 'Monitoring' },
     { path: '/market', icon: BarChart3, label: 'Market Insights' },
-    { path: '/farming', icon: Tractor, label: 'Smart Farming' },
   ];
 
   return (
@@ -52,7 +55,36 @@ export const Navbar: React.FC = () => {
                 {item.label}
               </NavLink>
             ))}
+
+            {/* Auth section */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-3 ml-4 pl-4 border-l border-[#5B532C]/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#63A361]/10 flex items-center justify-center">
+                    <UserCircle className="w-5 h-5 text-[#63A361]" />
+                  </div>
+                  <span className="text-sm font-medium text-[#5B532C]/70 max-w-[100px] truncate">
+                    {user?.name}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 rounded-lg text-[#5B532C]/40 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="ml-4 px-4 py-2 bg-[#63A361] text-white rounded-xl text-sm font-semibold hover:bg-[#578f55] transition-colors"
+              >
+                Login
+              </Link>
+            )}
           </div>
+
           {/* Mobile menu button */}
           <div className="md:hidden">
             <button
@@ -101,6 +133,32 @@ export const Navbar: React.FC = () => {
                   </div>
                 </NavLink>
               ))}
+
+              {/* Mobile auth */}
+              {isAuthenticated ? (
+                <div className="pt-2 border-t border-[#5B532C]/10">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <UserCircle className="w-5 h-5 text-[#63A361]" />
+                      <span className="text-sm font-medium text-[#5B532C]/70">{user?.name}</span>
+                    </div>
+                    <button
+                      onClick={() => { logout(); setIsOpen(false); }}
+                      className="text-sm text-red-500 font-medium"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-3 text-center bg-[#63A361] text-white rounded-xl font-semibold mt-2"
+                >
+                  Login
+                </Link>
+              )}
             </div>
           </motion.div>
         )}

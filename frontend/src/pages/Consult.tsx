@@ -4,8 +4,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import {
   Sprout, MapPin, Calendar, Droplets,
   DollarSign, Package, Recycle, Activity, Target, Clock,
-  Zap, Shield,
-  ArrowRight, ArrowLeft, BarChart3
+  Zap, Shield, Warehouse,
+  ArrowRight, ArrowLeft, BarChart3, Thermometer, Droplet, AlertTriangle
 } from 'lucide-react';
 import { getCropGrowthPhases, getConsultAnalysis, type ConsultAnalysisResponse } from '../ai/consultService';
 
@@ -132,9 +132,8 @@ const Consult: React.FC = () => {
           <div className="flex items-center gap-4">
             {[1, 2, 3].map((s) => (
               <React.Fragment key={s}>
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${
-                  step >= s ? 'bg-[#63A361] text-white' : 'bg-[#FDE7B3] text-[#5B532C] border-2 border-[#5B532C]/20'
-                }`}>
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${step >= s ? 'bg-[#63A361] text-white' : 'bg-[#FDE7B3] text-[#5B532C] border-2 border-[#5B532C]/20'
+                  }`}>
                   {s}
                 </div>
                 {s < 3 && (
@@ -221,7 +220,7 @@ const Consult: React.FC = () => {
                 <h3 className="text-center text-lg font-semibold text-[#5B532C]/70">
                   What You'll Discover
                 </h3>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { icon: BarChart3, title: "Yield Forecast", desc: "Expected production", color: "#63A361" },
@@ -454,6 +453,74 @@ const Consult: React.FC = () => {
                 </div>
               </div>
 
+              {/* Storage Strategy */}
+              {analysis.storageStrategy && (
+                <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-6 shadow-lg border border-teal-200">
+                  <h3 className="text-xl font-bold text-[#5B532C] mb-4 flex items-center gap-2">
+                    <Warehouse className="w-6 h-6 text-teal-600" />
+                    Storage Strategy
+                  </h3>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="bg-white/70 rounded-lg p-3 border border-teal-100">
+                      <Package className="w-5 h-5 mb-2 text-teal-600" />
+                      <p className="text-xs text-[#5B532C]/70">Method</p>
+                      <p className="text-sm font-bold text-[#5B532C]">{analysis.storageStrategy.method}</p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg p-3 border border-teal-100">
+                      <Clock className="w-5 h-5 mb-2 text-teal-600" />
+                      <p className="text-xs text-[#5B532C]/70">Duration</p>
+                      <p className="text-sm font-bold text-[#5B532C]">{analysis.storageStrategy.duration}</p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg p-3 border border-teal-100">
+                      <Thermometer className="w-5 h-5 mb-2 text-teal-600" />
+                      <p className="text-xs text-[#5B532C]/70">Optimal Temp</p>
+                      <p className="text-sm font-bold text-[#5B532C]">{analysis.storageStrategy.optimalTemp}</p>
+                    </div>
+                    <div className="bg-white/70 rounded-lg p-3 border border-teal-100">
+                      <Droplet className="w-5 h-5 mb-2 text-teal-600" />
+                      <p className="text-xs text-[#5B532C]/70">Optimal Humidity</p>
+                      <p className="text-sm font-bold text-[#5B532C]">{analysis.storageStrategy.optimalHumidity}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg border border-teal-100">
+                      <span className="text-sm text-[#5B532C]/70">Cost</span>
+                      <span className="font-bold text-[#5B532C]">{analysis.storageStrategy.costPerQuintal}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg border border-teal-100">
+                      <span className="text-sm text-[#5B532C]/70">Price Advantage</span>
+                      <span className="font-bold text-teal-600">{analysis.storageStrategy.priceAdvantage}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/60 rounded-lg border border-teal-100">
+                      <span className="text-sm text-[#5B532C]/70">Spoilage Risk</span>
+                      <span className={`font-bold ${analysis.storageStrategy.spoilageRisk?.toLowerCase().includes('high') ? 'text-red-600' :
+                        analysis.storageStrategy.spoilageRisk?.toLowerCase().includes('medium') ? 'text-amber-600' :
+                          'text-teal-600'
+                        }`}>{analysis.storageStrategy.spoilageRisk}</span>
+                    </div>
+                  </div>
+
+                  {analysis.storageStrategy.emergencyActions?.length > 0 && (
+                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="text-sm font-semibold text-[#5B532C] mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        Emergency Actions
+                      </p>
+                      <ul className="space-y-1">
+                        {analysis.storageStrategy.emergencyActions.map((action: string, idx: number) => (
+                          <li key={idx} className="text-sm text-[#5B532C]/80 flex items-start gap-2">
+                            <span className="text-amber-600 mt-0.5">•</span>
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Yield Forecast */}
               <div className="bg-white rounded-xl p-6 shadow-lg border border-[#5B532C]/10">
                 <h3 className="text-xl font-bold text-[#5B532C] mb-4 flex items-center gap-2">
@@ -483,11 +550,10 @@ const Consult: React.FC = () => {
                     <p className="text-sm text-[#5B532C]/70">Current Mandi Price</p>
                     <p className="text-2xl font-bold text-[#63A361]">{analysis.marketIntelligence.currentMandiPrice}</p>
                     <p className="text-sm text-[#5B532C]/70 mt-1">
-                      Trend: <span className={`font-medium ${
-                        analysis.marketIntelligence.pricetrend.toLowerCase() === 'rising' ? 'text-[#63A361]' :
+                      Trend: <span className={`font-medium ${analysis.marketIntelligence.pricetrend.toLowerCase() === 'rising' ? 'text-[#63A361]' :
                         analysis.marketIntelligence.pricetrend.toLowerCase() === 'falling' ? 'text-red-600' :
-                        'text-[#FFC50F]'
-                      }`}>{analysis.marketIntelligence.pricetrend}</span>
+                          'text-[#FFC50F]'
+                        }`}>{analysis.marketIntelligence.pricetrend}</span>
                     </p>
                   </div>
                   <div className="p-4 bg-[#FDE7B3]/50 rounded-lg border border-[#5B532C]/10">

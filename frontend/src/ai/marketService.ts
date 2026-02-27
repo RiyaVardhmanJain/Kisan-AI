@@ -83,6 +83,114 @@ const getMockWeatherData = (city: string): WeatherData => {
   });
 };
 
+// Distribution recommendation types
+export interface DistributionLotInput {
+  cropName: string;
+  quantity: number;
+  storageDays: number;
+}
+
+export interface StatePrice {
+  state: string;
+  market: string;
+  price: string;
+  distance?: string;
+}
+
+export interface DistributionResult {
+  recommendedMarkets: Array<{
+    market: string;
+    state: string;
+    distance: string;
+    price: string;
+    transportTime: string;
+    netRevenue: string;
+    spoilageRisk: string;
+  }>;
+  urgency: 'low' | 'medium' | 'high';
+  dispatchWindow: string;
+  summary: string;
+}
+
+/**
+ * Get AI-powered distribution recommendation for stored produce
+ */
+export const getDistributionRecommendation = async (
+  lot: DistributionLotInput,
+  prices: StatePrice[]
+): Promise<DistributionResult> => {
+  const Groq = (await import('groq-sdk')).default;
+  const groq = new Groq({
+    apiKey: import.meta.env.VITE_GROQ_API_KEY,
+    dangerouslyAllowBrowser: true
+  });
+
+  const priceList = prices.map(p => `${p.market} (${p.state}): ${p.price}${p.distance ? `, ${p.distance} away` : ''}`).join('\n');
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are an agricultural supply chain expert. Analyze stored produce data and market prices to recommend the best distribution plan. Factor in spoilage risk based on storage duration, transport time, and produce type. Return ONLY valid JSON.`
+        },
+        {
+          role: "user",
+          content: `Stored produce: ${lot.cropName}, Quantity: ${lot.quantity} quintals, Days in storage: ${lot.storageDays}.
+
+Available markets and prices:
+${priceList}
+
+Return JSON:
+{
+  "recommendedMarkets": [
+    { "market": "name", "state": "state", "distance": "X km", "price": "₹Y/quintal", "transportTime": "Z hours", "netRevenue": "₹N", "spoilageRisk": "low/medium/high" }
+  ],
+  "urgency": "low|medium|high",
+  "dispatchWindow": "dispatch recommendation",
+  "summary": "brief recommendation summary"
+}
+
+Rank by net revenue (price minus transport cost minus spoilage risk). Return top 3-5 markets.`
+        }
+      ],
+      model: "moonshotai/kimi-k2-instruct-0905",
+      temperature: 0.1,
+      max_tokens: 1000,
+      top_p: 0.9,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    if (!response) throw new Error('No response from AI');
+
+    let cleaned = response.trim().replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      recommendedMarkets: parsed.recommendedMarkets || [],
+      urgency: parsed.urgency || 'medium',
+      dispatchWindow: parsed.dispatchWindow || 'Dispatch within 24-48 hours',
+      summary: parsed.summary || 'Distribution analysis complete.'
+    };
+  } catch (error) {
+    console.error('Distribution recommendation error:', error);
+    return {
+      recommendedMarkets: prices.slice(0, 3).map(p => ({
+        market: p.market,
+        state: p.state,
+        distance: p.distance || 'Unknown',
+        price: p.price,
+        transportTime: 'Estimated 4-8 hours',
+        netRevenue: 'Calculate after transport costs',
+        spoilageRisk: lot.storageDays > 14 ? 'high' : lot.storageDays > 7 ? 'medium' : 'low'
+      })),
+      urgency: lot.storageDays > 14 ? 'high' : lot.storageDays > 7 ? 'medium' : 'low',
+      dispatchWindow: `Dispatch ${lot.cropName} within ${lot.storageDays > 14 ? '24 hours' : '3-5 days'}`,
+      summary: 'Fallback recommendation based on available price data.'
+    };
+  }
+};
+
 const normalizeWeatherData = (data: WeatherData): WeatherData => {
   return {
     ...data,

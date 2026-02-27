@@ -1,7 +1,7 @@
 const Warehouse = require('../models/Warehouse');
 const ProduceLot = require('../models/ProduceLot');
 const { getWeatherForCity, deriveStorageConditions } = require('../utils/weatherClient');
-const { checkAndFireAlerts } = require('../utils/spoilageEngine');
+const { checkAndFireAlerts, computeSpoilageRiskScore } = require('../utils/spoilageEngine');
 
 // GET /api/warehouses
 exports.getAll = async (req, res) => {
@@ -93,6 +93,7 @@ exports.getConditions = async (req, res) => {
         });
 
         const newAlerts = [];
+        const riskScores = [];
         for (const lot of lots) {
             const alerts = await checkAndFireAlerts({
                 lot,
@@ -101,6 +102,14 @@ exports.getConditions = async (req, res) => {
                 owner: req.user._id,
             });
             newAlerts.push(...alerts);
+
+            // Compute per-lot spoilage risk score
+            riskScores.push({
+                lotId: lot._id,
+                cropName: lot.cropName,
+                lotRef: lot.lotId,
+                riskScore: computeSpoilageRiskScore(lot, conditions),
+            });
         }
 
         res.json({
@@ -109,6 +118,7 @@ exports.getConditions = async (req, res) => {
             warehouseType: warehouse.type,
             activeLots: lots.length,
             newAlerts: newAlerts.length,
+            riskScores,
         });
     } catch (err) {
         console.error('Get conditions error:', err);

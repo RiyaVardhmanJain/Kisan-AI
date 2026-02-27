@@ -7,9 +7,9 @@ import {
   Leaf,
   Play
 } from 'lucide-react';
-import Market from '../components/Market';
 import leafImage from '../assets/leaf.jpg';
 import { Marquee3D } from '../effect/Component';
+import Market from '../components/Market';
 
 const ScrollIndicator = () => {
   const { scrollYProgress } = useScroll();
@@ -134,11 +134,12 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
-        {/* Market Section */}
-        <section className="relative border-t border-[#5B532C]/10">
-          <Market />
-        </section>
       </div>
+
+      {/* Market Section */}
+      <section className="relative border-t border-[#5B532C]/10">
+        <Market />
+      </section>
     </div>
   );
 };
