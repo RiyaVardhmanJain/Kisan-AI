@@ -1,4 +1,5 @@
 const Alert = require('../models/Alert');
+const { getShelfLife } = require('./shelfLife');
 
 const THRESHOLDS = {
     Onion: { maxHumidity: 65, maxTemp: 30 },
@@ -76,4 +77,46 @@ const checkAndFireAlerts = async ({ lot, warehouse, conditions, owner }) => {
     return savedAlerts;
 };
 
-module.exports = { THRESHOLDS, checkAndFireAlerts };
+/**
+ * Compute a 0–100 spoilage risk score for a lot.
+ * Combines: shelf-life remaining (50%), temp vs threshold (25%), humidity vs threshold (25%).
+ * Higher = more at risk.
+ */
+const computeSpoilageRiskScore = (lot, conditions) => {
+    const thresholds = THRESHOLDS[lot.cropName] || THRESHOLDS.default;
+
+    // Shelf-life component (0-50 points)
+    let shelfLifeScore = 0;
+    if (lot.recommendedSellByDate) {
+        const now = new Date();
+        const entry = new Date(lot.entryDate || lot.createdAt);
+        const sellBy = new Date(lot.recommendedSellByDate);
+        const totalDays = Math.max(1, (sellBy - entry) / (1000 * 60 * 60 * 24));
+        const daysRemaining = Math.max(0, (sellBy - now) / (1000 * 60 * 60 * 24));
+        const pctUsed = 1 - (daysRemaining / totalDays);
+        shelfLifeScore = Math.min(50, Math.round(pctUsed * 50));
+    } else {
+        const shelfDays = getShelfLife(lot.cropName);
+        const entry = new Date(lot.entryDate || lot.createdAt);
+        const daysStored = (new Date() - entry) / (1000 * 60 * 60 * 24);
+        shelfLifeScore = Math.min(50, Math.round((daysStored / shelfDays) * 50));
+    }
+
+    // Temp component (0-25 points)
+    let tempScore = 0;
+    if (conditions && conditions.temp > thresholds.maxTemp) {
+        const excess = conditions.temp - thresholds.maxTemp;
+        tempScore = Math.min(25, Math.round((excess / 15) * 25));
+    }
+
+    // Humidity component (0-25 points)
+    let humidityScore = 0;
+    if (conditions && conditions.humidity > thresholds.maxHumidity) {
+        const excess = conditions.humidity - thresholds.maxHumidity;
+        humidityScore = Math.min(25, Math.round((excess / 20) * 25));
+    }
+
+    return Math.min(100, shelfLifeScore + tempScore + humidityScore);
+};
+
+module.exports = { THRESHOLDS, checkAndFireAlerts, computeSpoilageRiskScore };

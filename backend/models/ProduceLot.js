@@ -25,13 +25,25 @@ const produceLotSchema = new mongoose.Schema({
 });
 
 // Auto-generate lotId before saving
-produceLotSchema.pre('save', async function (next) {
+produceLotSchema.pre('save', async function () {
     if (!this.lotId) {
         const year = new Date().getFullYear();
-        const count = await mongoose.model('ProduceLot').countDocuments();
-        this.lotId = `LOT-${year}-${String(count + 1).padStart(4, '0')}`;
+        const prefix = `LOT-${year}-`;
+        // Find the highest existing lotId for this year to avoid duplicates
+        const latest = await mongoose.model('ProduceLot')
+            .findOne({ lotId: { $regex: `^${prefix}` } })
+            .sort({ lotId: -1 })
+            .select('lotId')
+            .lean();
+        let nextNum = 1;
+        if (latest && latest.lotId) {
+            const numPart = parseInt(latest.lotId.replace(prefix, ''), 10);
+            if (!isNaN(numPart)) {
+                nextNum = numPart + 1;
+            }
+        }
+        this.lotId = `${prefix}${String(nextNum).padStart(4, '0')}`;
     }
-    next();
 });
 
 module.exports = mongoose.model('ProduceLot', produceLotSchema);

@@ -1,30 +1,37 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Package, Calendar, Clock, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Package, Calendar, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import type { LotData } from '../services/warehouseService';
 
 interface LotCardProps {
     lot: LotData;
     onViewTimeline?: (lot: LotData) => void;
-    onUpdateCondition?: (lot: LotData, condition: string) => void;
-    onSellDispatch?: (lot: LotData) => void;
+    onUpdateStatus?: (lot: LotData, newStatus: string) => void;
 }
 
-const conditionConfig = {
+const conditionConfig: Record<string, { label: string; bg: string; text: string; dot: string }> = {
     good: { label: 'Good', bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
     watch: { label: 'Watch', bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-yellow-500' },
     at_risk: { label: 'At Risk', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
     spoiled: { label: 'Spoiled', bg: 'bg-gray-200', text: 'text-gray-700', dot: 'bg-gray-500' },
 };
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string }> = {
     stored: { label: 'Stored', color: 'text-[#63A361]' },
     partially_dispatched: { label: 'Partially Sent', color: 'text-yellow-600' },
     dispatched: { label: 'Dispatched', color: 'text-blue-600' },
     sold: { label: 'Sold', color: 'text-gray-500' },
 };
 
-export const LotCard: React.FC<LotCardProps> = ({ lot, onViewTimeline, onSellDispatch }) => {
+const statusTransitions: Record<string, string[]> = {
+    stored: ['dispatched', 'sold'],
+    partially_dispatched: ['dispatched', 'sold'],
+    dispatched: ['sold'],
+    sold: [],
+};
+
+export const LotCard: React.FC<LotCardProps> = ({ lot, onViewTimeline, onUpdateStatus }) => {
+    const [statusOpen, setStatusOpen] = useState(false);
     const condition = conditionConfig[lot.currentCondition] || conditionConfig.good;
     const status = statusConfig[lot.status] || statusConfig.stored;
 
@@ -41,6 +48,8 @@ export const LotCard: React.FC<LotCardProps> = ({ lot, onViewTimeline, onSellDis
 
     const warehouseName =
         typeof lot.warehouse === 'object' ? lot.warehouse.name : 'Unknown';
+
+    const nextStatuses = statusTransitions[lot.status] || [];
 
     return (
         <motion.div
@@ -68,12 +77,52 @@ export const LotCard: React.FC<LotCardProps> = ({ lot, onViewTimeline, onSellDis
                 </div>
             </div>
 
-            {/* Quantity + status */}
+            {/* Quantity + status with dropdown */}
             <div className="flex items-center justify-between mb-3">
                 <span className="text-lg font-bold text-[#5B532C]">
                     {lot.quantityQuintals} <span className="text-xs font-normal text-[#5B532C]/50">quintals</span>
                 </span>
-                <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
+                <div className="relative">
+                    {onUpdateStatus && nextStatuses.length > 0 ? (
+                        <>
+                            <button
+                                onClick={() => setStatusOpen(!statusOpen)}
+                                className={`text-xs font-medium ${status.color} flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-50 border border-[#5B532C]/10 transition-colors`}
+                            >
+                                {status.label}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${statusOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            <AnimatePresence>
+                                {statusOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                                        className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-[#5B532C]/10 z-20 min-w-[130px] overflow-hidden"
+                                    >
+                                        {nextStatuses.map((s) => {
+                                            const sc = statusConfig[s] || statusConfig.stored;
+                                            return (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => {
+                                                        setStatusOpen(false);
+                                                        onUpdateStatus(lot, s);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-xs font-medium ${sc.color} hover:bg-gray-50 transition-colors`}
+                                                >
+                                                    Mark as {sc.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </>
+                    ) : (
+                        <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
+                    )}
+                </div>
             </div>
 
             {/* Shelf life progress */}
@@ -104,28 +153,15 @@ export const LotCard: React.FC<LotCardProps> = ({ lot, onViewTimeline, onSellDis
                     <Calendar className="w-3 h-3" />
                     Sell by {sellByDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                 </span>
-                <div className="flex items-center gap-3">
-                    {onViewTimeline && (
-                        <button
-                            onClick={() => onViewTimeline(lot)}
-                            className="text-xs text-[#63A361] font-medium flex items-center gap-0.5 hover:underline"
-                        >
-                            Timeline
-                            <ChevronRight className="w-3 h-3" />
-                        </button>
-                    )}
+                {onViewTimeline && (
                     <button
-                        onClick={() => {
-                            if (onSellDispatch && window.confirm(`Plan dispatch for ${lot.cropName}? You will be directed to market recommendations.`)) {
-                                onSellDispatch(lot);
-                            }
-                        }}
-                        className="px-3 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                        onClick={() => onViewTimeline(lot)}
+                        className="text-xs text-[#63A361] font-medium flex items-center gap-0.5 hover:underline"
                     >
+                        Timeline
                         <ChevronRight className="w-3 h-3" />
-                        Sell/Dispatch
                     </button>
-                </div>
+                )}
             </div>
         </motion.div>
     );

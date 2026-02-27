@@ -14,6 +14,10 @@ export interface FieldMonitoringPromptConfig {
   fieldType?: string;
 }
 
+export interface StorageMonitoringPromptConfig {
+  produceType?: string;
+}
+
 export function getCropMonitoringPrompt(config?: CropMonitoringPromptConfig): string {
   return `
 Analyze the crop image and return ONLY valid JSON. Detect crop type, diseases, pest infestations, and nutrient deficiencies using AI-powered image recognition.
@@ -336,5 +340,79 @@ NEVER INCLUDE:
 - Incomplete JSON objects
 
 ${config?.fieldType ? `Field Type: ${config.fieldType}` : ''}
+`.replace(/\s+/g, ' ').trim();
+}
+
+export function getStorageMonitoringPrompt(config?: StorageMonitoringPromptConfig): string {
+  return `
+Analyze the warehouse/storage image and return ONLY valid JSON. Detect storage conditions, produce quality, and potential risks in stored agricultural produce.
+For invalid images, return:
+{
+"produceCondition": "Not Applicable",
+"moldDetected": "Invalid Input",
+"confidenceLevel": 0,
+"analysisSummary": "Non-storage image detected",
+"moistureDamage": "N/A",
+"pestSigns": "N/A",
+"ventilationStatus": "N/A"
+}
+For valid storage/warehouse images, return:
+{
+"produceCondition": "excellent|good|fair|poor|critical",
+"moldDetected": "none|suspected|confirmed",
+"moistureDamage": "none|mild|moderate|severe",
+"pestSigns": "none|suspected|confirmed",
+"ventilationStatus": "adequate|insufficient|poor",
+"storageRisk": "low|medium|high|critical",
+"shelfLifeEstimate": "string",
+"environmentalFactors": [
+{
+"factor": "string",
+"status": "optimal|warning|critical"
+}
+],
+"recommendations": ["string"],
+"preventiveMeasures": ["string"],
+"confidenceLevel": number,
+"analysisSummary": "string"
+}
+Analysis Requirements:
+- Detect mold growth on stored produce from visual discoloration or fuzzy patches.
+- Identify moisture damage from water stains, wet spots, or condensation.
+- Detect pest infestation signs from droppings, damage patterns, or visible insects.
+- Assess ventilation adequacy from storage layout and visible airflow indicators.
+- Evaluate stacking quality and storage organization.
+- Estimate remaining shelf life based on visible produce condition.
+- Provide exactly 3 recommendations for improving storage conditions.
+- Provide exactly 3 preventive measures to reduce spoilage risk.
+- Maintain confidence level between 80%-100% for valid analyses.
+- Keep response concise and focused.
+- Only use information extractable from the image (visible conditions, patterns, colors).
+
+CRITICAL JSON FORMATTING REQUIREMENTS:
+- Response must be ONLY pure JSON - no markdown, no explanations, no text before or after
+- Use double quotes for ALL strings and keys
+- NO trailing commas anywhere
+- NO single quotes - only double quotes
+- NO explanatory text outside the JSON object
+- NO code blocks or markdown formatting
+- Start response with { and end with }
+- All numeric values must be actual numbers (not strings)
+- All arrays must contain valid elements
+
+EXAMPLE OF CORRECT FORMAT:
+{
+"produceCondition": "fair",
+"moldDetected": "suspected",
+"storageRisk": "medium",
+"confidenceLevel": 87
+}
+NEVER INCLUDE:
+- \`\`\`json or \`\`\` markers
+- Explanatory text like "Here's the analysis:"
+- Comments or notes
+- Incomplete JSON objects
+
+${config?.produceType ? `Produce Type: ${config.produceType}` : ''}
 `.replace(/\s+/g, ' ').trim();
 }

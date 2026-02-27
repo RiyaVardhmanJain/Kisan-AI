@@ -70,7 +70,12 @@ exports.create = async (req, res) => {
         res.status(201).json({ lot });
     } catch (err) {
         console.error('Create lot error:', err);
-        res.status(500).json({ error: 'Failed to create lot' });
+        if (err.code === 11000) {
+            // Duplicate key error — retry with a fresh lotId
+            return res.status(500).json({ error: 'Lot ID collision — please try again' });
+        }
+        const message = err.message || 'Failed to create lot';
+        res.status(500).json({ error: message });
     }
 };
 

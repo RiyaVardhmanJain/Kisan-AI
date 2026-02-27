@@ -24,6 +24,7 @@ export const getMarketPrompt = (config: MarketPromptConfig) => {
     3. Provide actionable recommendations for farmers based on weather-market conditions
     4. Assess the overall risk level for different crops in the market
     5. Generate modified market data that reflects weather-adjusted prices and conditions
+    6. Given produce in storage, recommend which state/market offers the best price factoring in storage days elapsed and spoilage risk
 
     **OUTPUT FORMAT:**
     Return ONLY valid JSON with the following structure:
@@ -42,6 +43,19 @@ export const getMarketPrompt = (config: MarketPromptConfig) => {
       },
       "modifiedMarketData": {
         // Same structure as input market data but with weather-adjusted values
+      },
+      "distributionPlan": {
+        "recommendedMarkets": [
+          {
+            "market": "string - market name",
+            "distance": "string - distance from storage",
+            "price": "string - current price per quintal",
+            "transportTime": "string - estimated transport time",
+            "netRevenue": "string - estimated net revenue after transport costs"
+          }
+        ],
+        "urgency": "low|medium|high",
+        "dispatchWindow": "string - recommended dispatch window"
       }
     }
 

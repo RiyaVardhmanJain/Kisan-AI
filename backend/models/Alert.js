@@ -6,7 +6,7 @@ const alertSchema = new mongoose.Schema({
     warehouse: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
     alertType: {
         type: String,
-        enum: ['spoilage_risk', 'humidity_breach', 'temp_breach', 'overdue', 'custom'],
+        enum: ['spoilage_risk', 'humidity_breach', 'temp_breach', 'overdue', 'capacity_warning', 'custom'],
         required: true,
     },
     severity: {

@@ -45,6 +45,7 @@ FARMER'S DETAILS:
 - Location: ${input.tahsil}
 
 INSTRUCTIONS: Be extremely concise. Use short sentences. Focus only on essential information. Avoid lengthy explanations.
+PRIORITY: Storage strategy and spoilage prevention should be the most detailed section.
 
 Return ONLY valid JSON:
 
@@ -56,6 +57,16 @@ Return ONLY valid JSON:
     "progressPercentage": number,
     "nextPhase": "Phase name",
     "daysToNextPhase": number
+  },
+  "storageStrategy": {
+    "method": "Cold storage / Dry godown / Ventilated warehouse",
+    "duration": "How long can be stored safely",
+    "optimalTemp": "Optimal temperature range in °C",
+    "optimalHumidity": "Optimal humidity range in %",
+    "costPerQuintal": "₹X/quintal/month",
+    "priceAdvantage": "Y% price advantage if stored until peak season",
+    "spoilageRisk": "Low/Medium/High with explanation",
+    "emergencyActions": ["action1 if spoilage detected", "action2", "action3"]
   },
   "yieldForecast": {
     "expectedYieldPerAcre": "X kg/acre",
@@ -209,6 +220,7 @@ export function parseConsultAnalysis(response: string): any {
     // Validate required fields
     const requiredFields = [
       'growthInsights',
+      'storageStrategy',
       'yieldForecast',
       'farmingSchedule',
       'marketIntelligence',

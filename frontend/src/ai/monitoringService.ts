@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { 
-  getCropMonitoringPrompt, 
-  getSoilMonitoringPrompt, 
-  getThermalMonitoringPrompt, 
+import {
+  getCropMonitoringPrompt,
+  getSoilMonitoringPrompt,
+  getThermalMonitoringPrompt,
   getFieldMonitoringPrompt,
   CropMonitoringPromptConfig,
   SoilMonitoringPromptConfig,
@@ -18,7 +18,7 @@ import {
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 // Switched to latest stable Gemini 2.5 Pro as requested
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`;
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
 interface GeminiResponse {
   candidates: Array<{
@@ -60,32 +60,32 @@ function cleanAndParseJSON<T>(text: string): T {
   try {
     // Remove markdown code blocks
     let cleaned = text.trim().replace(/^```json\s*|\s*```$/gm, '').trim();
-    
+
     // Remove any text before the first { or after the last }
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
-    
+
     // Try to parse as-is first
     try {
       return JSON.parse(cleaned);
     } catch (firstError) {
       // If that fails, try to fix common issues
-      
+
       // Replace single quotes with double quotes (but be careful with apostrophes in text)
       cleaned = cleaned.replace(/'/g, '"');
-      
+
       // Remove trailing commas before closing braces/brackets
       cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
-      
+
       // Fix unquoted property names (basic case)
       cleaned = cleaned.replace(/(\w+):/g, '"$1":');
-      
+
       // Remove any newlines or excessive whitespace within the JSON
       cleaned = cleaned.replace(/\s+/g, ' ');
-      
+
       return JSON.parse(cleaned);
     }
   } catch (error) {

@@ -2,8 +2,61 @@ import axios from 'axios';
 import { getDiseaseDetectionPrompt, DiseasePromptConfig } from './diseasePrompt';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-// Updated to use Gemini 2.5 Pro (latest stable release)
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`;
+// Use Gemini 2.0 Flash — fast multimodal model optimised for image analysis
+// (gemini-2.5-pro is a "thinking" model that takes 30-60s+ for image tasks, causing timeouts)
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+
+// ─── Logging helpers ────────────────────────────────────────────────────────
+const LOG_PREFIX = '[DiseaseDetection]';
+const _t0 = Date.now();
+const _ts = () => `+${((Date.now() - _t0) / 1000).toFixed(2)}s`;
+
+const log = (...args: unknown[]) => console.log(LOG_PREFIX, _ts(), ...args);
+const warn = (...args: unknown[]) => console.warn(LOG_PREFIX, _ts(), ...args);
+const err = (...args: unknown[]) => console.error(LOG_PREFIX, _ts(), ...args);
+
+/**
+ * Compress an image data-URL to a target maximum dimension & quality.
+ * Returns a JPEG data-URL.  Falls back to the original on any error.
+ */
+const compressImageForAPI = (
+  dataUrl: string,
+  maxDim = 1024,
+  quality = 0.8
+): Promise<string> =>
+  new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          const originalKB = Math.round((dataUrl.length * 3) / 4 / 1024);
+          const compressedKB = Math.round((compressed.length * 3) / 4 / 1024);
+          log(`Image compressed: ${img.width}x${img.height} → ${w}x${h}, ${originalKB}KB → ${compressedKB}KB`);
+          resolve(compressed);
+        } else {
+          warn('Canvas 2D context unavailable, using original image');
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => {
+        warn('Image load failed during compression, using original');
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      warn('Image compression error, using original:', e);
+      resolve(dataUrl);
+    }
+  });
 
 export interface DiseaseAnalysisResult {
   cropName: string;
@@ -41,6 +94,12 @@ export interface DiseaseAnalysisResult {
   preventionPlan: string[];
   confidenceLevel: number;
   diagnosisSummary: string;
+}
+
+export interface SpoilageAnalysisResult extends DiseaseAnalysisResult {
+  spoilageType?: string;
+  storageCondition?: string;
+  remainingShelfLife?: string;
 }
 
 interface GeminiResponse {
@@ -124,6 +183,32 @@ const DEFAULT_RESPONSE: DiseaseAnalysisResult = {
   diagnosisSummary: "Disease analysis completed with moderate confidence. Follow recommended treatment protocols."
 };
 
+const DEFAULT_STORAGE_RESPONSE: SpoilageAnalysisResult = {
+  ...DEFAULT_RESPONSE,
+  cropName: "Unknown Produce",
+  diseaseName: "Unknown Spoilage",
+  spoilageType: "none",
+  storageCondition: "fair",
+  remainingShelfLife: "Unknown",
+  symptomDescription: "Stored produce analysis incomplete",
+  organicTreatments: [
+    "Improve ventilation in storage area",
+    "Apply food-grade preservative coating",
+    "Separate affected produce immediately"
+  ],
+  ipmStrategies: [
+    "Install humidity monitoring sensors",
+    "Use biological pest control agents",
+    "Implement FIFO stock rotation"
+  ],
+  preventionPlan: [
+    "Maintain optimal temperature and humidity",
+    "Regular quality inspection schedule",
+    "Ensure proper spacing between storage bags"
+  ],
+  diagnosisSummary: "Storage spoilage analysis completed with moderate confidence. Follow recommended storage protocols."
+};
+
 // Function to extract and clean JSON from response text
 const extractJSONFromResponse = (responseText: string): string => {
   // Remove all markdown formatting
@@ -200,15 +285,15 @@ const validateAndFixResponse = (parsed: any): DiseaseAnalysisResult => {
     // Validate spreadRisk and ensure it's out of 100
     if (result.realTimeMetrics.spreadRisk && typeof result.realTimeMetrics.spreadRisk === 'object') {
       let spreadValue = typeof result.realTimeMetrics.spreadRisk.value === 'number' ? result.realTimeMetrics.spreadRisk.value : DEFAULT_RESPONSE.realTimeMetrics.spreadRisk.value;
-      
+
       // If value is less than 1, multiply by 100 to convert from decimal to percentage
       if (spreadValue < 1) {
         spreadValue = Math.round(spreadValue * 100);
       }
-      
+
       // Ensure value is between 0 and 100
       spreadValue = Math.max(0, Math.min(100, spreadValue));
-      
+
       result.realTimeMetrics.spreadRisk = {
         level: typeof result.realTimeMetrics.spreadRisk.level === 'string' ? result.realTimeMetrics.spreadRisk.level : DEFAULT_RESPONSE.realTimeMetrics.spreadRisk.level,
         value: spreadValue,
@@ -249,135 +334,178 @@ const validateAndFixResponse = (parsed: any): DiseaseAnalysisResult => {
 export const analyzePlantImage = async (
   imageData: string,
   config?: DiseasePromptConfig
-): Promise<DiseaseAnalysisResult> => {
+): Promise<DiseaseAnalysisResult | SpoilageAnalysisResult> => {
+  const isStorageContext = config?.context === 'storage';
+  const defaultResponse = isStorageContext ? DEFAULT_STORAGE_RESPONSE : DEFAULT_RESPONSE;
+  const callStart = Date.now();
+
   try {
-    console.log('Starting plant image analysis...');
-    
-    const { data } = await axios.post<GeminiResponse>(API_URL, {
+    // ── 1. Pre-flight checks ────────────────────────────────────────────
+    log(`▶ Starting ${isStorageContext ? 'STORAGE SPOILAGE' : 'PLANT DISEASE'} analysis`);
+    log(`  API URL  : ${API_URL.replace(/key=.*/, 'key=***')}`);
+    log(`  API KEY  : ${API_KEY ? `set (${API_KEY.substring(0, 8)}…)` : '⚠ MISSING'}`);
+    log(`  Config   : ${JSON.stringify(config ?? {})}`);
+
+    if (!API_KEY) {
+      err('VITE_GEMINI_API_KEY is not set in .env — aborting');
+      throw new Error('Gemini API key is missing. Set VITE_GEMINI_API_KEY in your .env file.');
+    }
+
+    // ── 2. Compress image ───────────────────────────────────────────────
+    log('  Compressing image for API…');
+    const compressedImage = await compressImageForAPI(imageData);
+    const base64Data = compressedImage.split(',')[1];
+    const payloadKB = Math.round((base64Data.length * 3) / 4 / 1024);
+    log(`  Payload size: ${payloadKB} KB`);
+
+    // ── 3. Build request ────────────────────────────────────────────────
+    const prompt = getDiseaseDetectionPrompt(config);
+    log(`  Prompt length: ${prompt.length} chars`);
+
+    const requestBody = {
       contents: [{
         parts: [
-          { text: getDiseaseDetectionPrompt(config) },
+          { text: prompt },
           {
             inline_data: {
-              mime_type: "image/jpeg",
-              data: imageData.split(',')[1]
-            }
-          }
-        ]
+              mime_type: 'image/jpeg',
+              data: base64Data,
+            },
+          },
+        ],
       }],
       generationConfig: {
         temperature: 0.3,
         topK: 32,
         topP: 1,
-        maxOutputTokens: 4096, // Increased to handle complete responses
-      }
-    }, {
-      headers: { 
-        'Content-Type': 'application/json'
+        maxOutputTokens: 4096,
       },
-      timeout: 30000 // 30 second timeout
+    };
+
+    // ── 4. Call Gemini ──────────────────────────────────────────────────
+    log('  ⏳ Calling Gemini API…');
+    const apiStart = Date.now();
+
+    const { data } = await axios.post<GeminiResponse>(API_URL, requestBody, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 120_000, // 120s — generous for multimodal
     });
 
-    const responseText = data.candidates[0]?.content?.parts[0]?.text;
+    const apiMs = Date.now() - apiStart;
+    log(`  ✅ Gemini responded in ${(apiMs / 1000).toFixed(2)}s`);
+
+    // ── 5. Extract text ─────────────────────────────────────────────────
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!responseText) {
-      console.warn('No analysis content found, using default response');
-      return DEFAULT_RESPONSE;
+      warn('No analysis text in response. Full response:', JSON.stringify(data).substring(0, 500));
+      warn('Returning default response');
+      return defaultResponse;
     }
 
-    console.log('Raw response received:', responseText.substring(0, 200) + '...');
+    log(`  Response length: ${responseText.length} chars`);
+    log(`  Raw (first 300): ${responseText.substring(0, 300)}`);
 
-    // Extract and clean JSON
+    // ── 6. Parse JSON ───────────────────────────────────────────────────
     const cleanedText = extractJSONFromResponse(responseText);
-    console.log('Cleaned JSON text:', cleanedText.substring(0, 200) + '...');
+    log(`  Cleaned JSON (first 300): ${cleanedText.substring(0, 300)}`);
 
     let parsedResult: any;
     try {
       parsedResult = JSON.parse(cleanedText);
-      console.log('JSON parsed successfully');
+      log('  ✅ JSON parsed on first attempt');
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Cleaned Response Text:', cleanedText);
-      
-      // Try alternative parsing methods
+      err('  JSON Parse Error:', parseError);
+      err('  Cleaned text:', cleanedText);
+
+      // ── 6b. Recovery parse ────────────────────────────────────────────
       try {
-        // Try to fix common JSON issues and handle truncation
         let fixedJson = cleanedText
-          .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
-          .replace(/([{,]\s*)(\w+):/g, '$1"$2":') // Add quotes to unquoted keys
-          .replace(/:\s*([^",{\[\s][^",}\]\]]*?)(\s*[,\}\]])/g, ': "$1"$2'); // Add quotes to unquoted string values
-        
-        // Handle specific truncation patterns
+          .replace(/(\s*[}\]])/g, '$1')   // trailing commas
+          .replace(/([{,]\s*)(\w+):/g, '$1"$2":')  // unquoted keys
+          .replace(/:\s*([^",{\[\s][^",}\]\]]*?)(\s*[,\}\]])/g, ': "$1"$2');
+
         if (fixedJson.includes('"diseaseProgression"') && !fixedJson.includes('}')) {
-          // Complete the diseaseProgression object
           if (fixedJson.includes('"rate":')) {
             fixedJson = fixedJson.replace(/"rate":\s*[^}]*$/, '"rate": 5}}');
           }
         }
-        
-        // Ensure proper closing
+
         if (!fixedJson.endsWith('}')) {
           const openBraces = (fixedJson.match(/\{/g) || []).length;
           const closeBraces = (fixedJson.match(/\}/g) || []).length;
-          const missingBraces = openBraces - closeBraces;
-          
-          if (missingBraces > 0) {
-            fixedJson += '}'.repeat(missingBraces);
-          }
+          const missing = openBraces - closeBraces;
+          if (missing > 0) fixedJson += '}'.repeat(missing);
         }
-        
+
         parsedResult = JSON.parse(fixedJson);
-        console.log('JSON fixed and parsed successfully');
+        log('  ✅ JSON fixed and parsed on second attempt');
       } catch (secondError) {
-        console.error('Second parse attempt failed:', secondError);
-        console.warn('Using default response due to JSON parsing failure');
-        return DEFAULT_RESPONSE;
+        err('  Second parse attempt also failed:', secondError);
+        warn('  Returning default response due to unparseable JSON');
+        return defaultResponse;
       }
     }
 
-    // Validate and fix the response
+    // ── 7. Validate ─────────────────────────────────────────────────────
     const validatedResult = validateAndFixResponse(parsedResult);
-    console.log('Response validated and fixed successfully');
-    
+    const totalMs = Date.now() - callStart;
+    log(`  ✅ Analysis complete in ${(totalMs / 1000).toFixed(2)}s`);
+    log(`  Result → disease=${validatedResult.diseaseName}, crop=${validatedResult.cropName}, confidence=${validatedResult.confidenceLevel}%`);
+
     return validatedResult;
-    
+
   } catch (error) {
-    console.error('Analysis error:', error);
-    
-    // Handle specific error cases
+    const totalMs = Date.now() - callStart;
+    err(`  ❌ Analysis FAILED after ${(totalMs / 1000).toFixed(2)}s`, error);
+
+    // ── Error classification ──────────────────────────────────────────
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
-      
+      const code = error.code;
+      const responseData = error.response?.data;
+
+      err(`  Axios error: status=${status}, code=${code}`);
+      if (responseData) err('  Response data:', JSON.stringify(responseData).substring(0, 500));
+
+      if (code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        err(`  ⏱ REQUEST TIMED OUT after ${(totalMs / 1000).toFixed(1)}s`);
+        throw new Error(`Analysis timed out after ${Math.round(totalMs / 1000)}s. The server took too long. Please try again with a smaller image.`);
+      }
+
+      if (code === 'ERR_NETWORK') {
+        err('  🌐 Network error — no internet or CORS issue');
+        throw new Error('Network error. Please check your internet connection and try again.');
+      }
+
       if (status === 429) {
-        console.warn('Rate limit exceeded, using default response');
-        return DEFAULT_RESPONSE;
+        warn('  Rate limit (429) — too many requests');
+        throw new Error('API rate limit reached. Please wait a moment and try again.');
       }
-      
+
       if (status === 400) {
-        console.warn('Bad request - invalid image or prompt, using default response');
-        return DEFAULT_RESPONSE;
+        warn('  Bad request (400) — possibly invalid image format');
+        return defaultResponse;
       }
-      
+
       if (status === 401) {
         throw new Error('Invalid API key. Please check your VITE_GEMINI_API_KEY environment variable.');
       }
-      
+
       if (status === 403) {
         throw new Error('API access forbidden. Please check your API key permissions.');
       }
-      
+
       if (status && status >= 500) {
-        console.warn('Server error, using default response');
-        return DEFAULT_RESPONSE;
-      }
-      
-      if (error.code === 'ERR_NETWORK' || error.message.includes('timeout')) {
-        console.warn('Network error, using default response');
-        return DEFAULT_RESPONSE;
+        warn(`  Server error (${status})`);
+        throw new Error(`Google API server error (${status}). Please try again in a few seconds.`);
       }
     }
-    
-    // For other errors, return default response
-    console.warn('Unknown error, using default response');
-    return DEFAULT_RESPONSE;
+
+    // Re-throw if it's already an Error with a message
+    if (error instanceof Error) throw error;
+
+    // Unknown
+    err('  Unknown error type:', error);
+    throw new Error('An unexpected error occurred during analysis. Check the browser console for details.');
   }
 };

@@ -26,6 +26,8 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vs } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { useAuth } from "../context/AuthContext"
+import { getDbContext } from "../hooks/useDbChatContext"
 
 interface Message {
   text: string
@@ -206,7 +208,7 @@ const MarkdownMessage: React.FC<{ content: string }> = ({ content }) => (
           </SyntaxHighlighter>
         ) : (
           <code className={className} {...props}>
-          {children}
+            {children}
           </code>
         )
       },
@@ -251,7 +253,7 @@ const MessageComponent: React.FC<{ message: Message }> = ({ message }) => (
   </motion.div>
 )
 
-const QuickActions: React.FC<{ onSelect: (action: string) => void }> = ({ onSelect }) => {
+const QuickActions: React.FC<{ onSelect: (action: string) => void; isLoggedIn: boolean }> = ({ onSelect, isLoggedIn }) => {
   const actions = [
     {
       icon: <Tractor className="w-5 h-5" />,
@@ -287,6 +289,25 @@ const QuickActions: React.FC<{ onSelect: (action: string) => void }> = ({ onSele
           <span className="text-sm font-medium">{label}</span>
         </button>
       ))}
+      {/* DB-aware actions (show for logged-in users) */}
+      {isLoggedIn && (
+        <>
+          <button
+            onClick={() => onSelect("Show me all my stored produce lots")}
+            className="flex overflow-hidden relative items-center p-4 rounded-xl border transition-all duration-300 group bg-[#FDE7B3]/20 border-[#FFC50F]/30 hover:border-[#FFC50F]/60"
+          >
+            <span className="mr-3 text-[#63A361]">🌾</span>
+            <span className="text-sm font-medium">My Stored Crops</span>
+          </button>
+          <button
+            onClick={() => onSelect("Give me a summary of my warehouse and alerts")}
+            className="flex overflow-hidden relative items-center p-4 rounded-xl border transition-all duration-300 group bg-[#FDE7B3]/20 border-[#FFC50F]/30 hover:border-[#FFC50F]/60"
+          >
+            <span className="mr-3 text-[#63A361]">🏭</span>
+            <span className="text-sm font-medium">Storage Summary</span>
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -322,6 +343,7 @@ const AgriTechChatbot: React.FC<AgriTechChatbotProps> = ({
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const t = translations[language]
+  const { user, token } = useAuth()
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -388,11 +410,35 @@ const AgriTechChatbot: React.FC<AgriTechChatbotProps> = ({
       let accumulatedResponse = ""
       let accumulatedThinking = ""
 
+      // Fetch DB context / handle mutations via backend
+      let dbContext: string | undefined
+      if (user && token) {
+        try {
+          const result = await getDbContext(userMessage, token)
+
+          // Mutation responses (consent prompt, confirm, reject) come back as directReply
+          // Skip the AI call entirely — show the reply directly
+          if (result.directReply) {
+            setMessages(prev => [
+              ...prev.slice(0, -1),
+              { text: userMessage, sender: "user", timestamp: currentTime, status: "sent" },
+              { text: result.directReply!, sender: "ai", timestamp: Date.now() }
+            ])
+            setIsLoading(false)
+            return
+          }
+
+          dbContext = result.context ?? undefined
+        } catch { /* DB context is optional — fall through to normal AI */ }
+      }
+
+
       const finalText = await aiService.getAIResponse(
         input, // Use original input with voice indicator for AI context
         {
           userLanguage: language,
           userLocation,
+          dbContext,
           previousMessages: messages.map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
             content: msg.text
@@ -747,7 +793,7 @@ const AgriTechChatbot: React.FC<AgriTechChatbotProps> = ({
                 </div>
               )}
               {messages.length === 0 && (
-                <QuickActions onSelect={handleQuickAction} />
+                <QuickActions onSelect={handleQuickAction} isLoggedIn={!!user} />
               )}
               {messages.map((message, index) => (
                 <MessageComponent key={index} message={message} />

@@ -7,10 +7,11 @@ interface KisanAIContext {
    userInput: string;
    userLocation?: string;
    userLanguage?: string;
+   dbContext?: string;
    previousMessages?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
-const generateChatbotPrompt = ({ userInput, userLocation, userLanguage = "en", previousMessages = [] }: KisanAIContext): string => {
+const generateChatbotPrompt = ({ userInput, userLocation, userLanguage = "en", dbContext, previousMessages = [] }: KisanAIContext): string => {
    return `
 Hello! I'm Kisan-AI, your multilingual agricultural assistant. I'm here to give you clear, actionable advice that's easy to follow and useful right away. I excel at understanding voice inputs and can communicate fluently in multiple languages.
 
@@ -135,6 +136,19 @@ Common schemes to consider based on query type:
 - **Land & Water:** Watershed Development, Pradhan Mantri Krishi Sinchayee Yojana (PMKSY), Soil Health Card Scheme
 
 Always provide authentic government portal links. For state-specific queries, include relevant state agriculture department schemes as well.
+
+${userInput.includes('🎤') ? '\n\n**Note:** This is a voice input — be concise and clear in your response.' : ''}
+
+${dbContext ? `
+---
+
+**REAL-TIME WAREHOUSE DATA (from user's actual storage):**
+${dbContext}
+
+Use this data to answer the user's query. Reference specific warehouse names, crop names, quantities, and conditions from above. If the data shows alerts or at-risk items, proactively mention them.
+
+---
+` : ''}
 
 **USER QUERY:**
 ${userInput}

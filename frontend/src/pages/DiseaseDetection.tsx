@@ -180,6 +180,14 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
 
   const processFile = async () => {
     if (!image) return;
+
+    const t0 = Date.now();
+    const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+    const TAG = '[DiseaseDetection:UI]';
+
+    console.log(TAG, 'processFile() called');
+    console.log(TAG, `Image state: ${image ? `set (${Math.round(image.length / 1024)}KB base64)` : 'null'}`);
+
     try {
       setErrorMessage(null);
       setIsAnalyzing(true);
@@ -187,55 +195,108 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       setAnalysisProgress(0);
       setProcessingSteps([]);
       setCurrentStep(0);
-      
+
+      // ── Build config ──────────────────────────────────────────────────
+      const config: DiseasePromptConfig = { cropType, severityLevel };
+      console.log(TAG, `Config:`, config);
+
+      // ── Start API call IMMEDIATELY ────────────────────────────────────
+      // The animation runs CONCURRENTLY so we don't waste 11+ seconds
+      console.log(TAG, `[${elapsed()}] Starting API call and animation concurrently…`);
+
+      const apiPromise = analyzePlantImage(image, config);
+
+      // ── Progress animation (runs while API is in-flight) ─────────────
       const steps = [
-        {
-          message: "Initializing processing pipeline...",
-          duration: 1000,
-        },
-        { message: "Uploading image...", duration: 1500 },
-        { message: "Performing image analysis...", duration: 2000 },
-        { message: "Running AI model predictions...", duration: 2500 },
-        { message: "Analyzing disease patterns...", duration: 2000 },
-        { message: "Generating recommendations...", duration: 1500 },
-        { message: "Finalizing analysis report...", duration: 1000 },
+        { message: "Compressing and uploading image…", duration: 1500 },
+        { message: "Performing image analysis…", duration: 3000 },
+        { message: "Running AI disease model…", duration: 4000 },
+        { message: "Analyzing disease patterns…", duration: 3000 },
+        { message: "Generating recommendations…", duration: 2000 },
+        { message: "Waiting for AI results…", duration: 60000 }, // long step - waits for API
       ];
+
+      let apiDone = false;
+      let apiResult: Awaited<ReturnType<typeof analyzePlantImage>> | null = null;
+      let apiError: unknown = null;
+
+      // Track when the API finishes
+      apiPromise
+        .then((r) => { apiResult = r; apiDone = true; console.log(TAG, `[${elapsed()}] API resolved ✅`); })
+        .catch((e) => { apiError = e; apiDone = true; console.error(TAG, `[${elapsed()}] API rejected ❌`, e); });
+
       let progress = 0;
-      const progressIncrement = 100 / steps.length;
+      const maxAutoProgress = 90; // never go past 90% until API returns
+
       for (let i = 0; i < steps.length; i++) {
+        if (apiDone) break; // API finished early, jump to results
+
         const step = steps[i];
         setCurrentStep(i);
         addProcessingStep(step.message);
-        const startProgress = progress;
-        const endProgress = progress + progressIncrement;
+        console.log(TAG, `[${elapsed()}] Step ${i + 1}/${steps.length}: ${step.message}`);
+
+        const stepStart = progress;
+        const stepEnd = Math.min(
+          progress + maxAutoProgress / steps.length,
+          maxAutoProgress
+        );
         const duration = step.duration;
         const startTime = Date.now();
-        while (progress < endProgress) {
-          const elapsed = Date.now() - startTime;
-          const percentage = Math.min(elapsed / duration, 1);
-          progress = startProgress + progressIncrement * percentage;
-          setAnalysisProgress(Math.min(progress, 99));
-          await new Promise((r) => setTimeout(r, 50));
+
+        while (progress < stepEnd && !apiDone) {
+          const pct = Math.min((Date.now() - startTime) / duration, 1);
+          progress = stepStart + (stepEnd - stepStart) * pct;
+          setAnalysisProgress(Math.min(progress, maxAutoProgress));
+          await new Promise((r) => setTimeout(r, 80));
         }
-        await new Promise((r) => setTimeout(r, 200));
       }
-      const config: DiseasePromptConfig = { cropType, severityLevel };
-      let result = await analyzePlantImage(image, config);
+
+      // ── Wait for API if animation finished first ──────────────────────
+      if (!apiDone) {
+        console.log(TAG, `[${elapsed()}] Animation done, waiting for API…`);
+        try {
+          apiResult = await apiPromise;
+          console.log(TAG, `[${elapsed()}] API finally resolved ✅`);
+        } catch (e) {
+          apiError = e;
+          console.error(TAG, `[${elapsed()}] API finally rejected ❌`, e);
+        }
+      }
+
+      // ── Handle API error ──────────────────────────────────────────────
+      if (apiError) {
+        throw apiError;
+      }
+
+      if (!apiResult) {
+        throw new Error('Analysis returned no result.');
+      }
+
+      console.log(TAG, `[${elapsed()}] Got result:`, {
+        disease: apiResult.diseaseName,
+        crop: apiResult.cropName,
+        confidence: apiResult.confidenceLevel,
+        severity: apiResult.severityLevel,
+      });
+
       // Update lastUpdated to use current date
-      result = {
-        ...result,
+      let result = {
+        ...apiResult,
         realTimeMetrics: {
-          ...result.realTimeMetrics,
+          ...apiResult.realTimeMetrics,
           environmentalConditions: {
-            ...result.realTimeMetrics.environmentalConditions,
+            ...apiResult.realTimeMetrics.environmentalConditions,
             lastUpdated: new Date().toLocaleDateString(),
           },
         },
       };
+
       setAnalysisProgress(100);
       await new Promise((r) => setTimeout(r, 500));
       addProcessingStep("Analysis complete!");
       setAnalysisResult(result);
+      toast.success('Disease analysis completed!', { duration: 3000 });
 
       // Create a lightweight preview (to avoid storing very large images)
       const createPreview = async (dataUrl: string, maxW = 600, maxH = 600): Promise<string> => {
@@ -270,10 +331,12 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
 
       setIsResultsVisible(true);
       onAnalysisComplete?.(result);
+      console.log(TAG, `[${elapsed()}] ✅ processFile() complete`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Analysis failed",
-      );
+      const msg = error instanceof Error ? error.message : "Analysis failed. Please try again.";
+      console.error(TAG, `[${elapsed()}] ❌ processFile() error:`, error);
+      setErrorMessage(msg);
+      toast.error(msg, { duration: 6000 });
     } finally {
       setIsAnalyzing(false);
     }
