@@ -17,8 +17,10 @@ frontend/.vite/
 .env
 .env.local
 .env.*.local
+.env.development
 .env.development.local
 .env.test.local
+.env.production
 .env.production.local
 backend/.env.local
 
