@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Thermometer,
   Zap,
-  ShieldCheck,
   Truck,
   CheckCircle,
   TrendingUp,
@@ -33,10 +32,8 @@ import { StorageGauge } from "../components/StorageGauge"
 import { LotCard } from "../components/LotCard"
 import { AlertPanel } from "../components/AlertPanel"
 import { LotTimeline } from "../components/LotTimeline"
-import { SpoilageAlert } from "../components/SpoilageAlert"
 import { DispatchConfirmForm } from "../components/DispatchConfirmForm"
-import { analyzeStorageConditions } from "../ai/storageService"
-import type { StorageUnit, StorageAnalysisResult } from "../ai/storagePrompt"
+import type { StorageUnit } from "../ai/storagePrompt"
 import {
   getDistributionRecommendation,
   type DistributionResult,
@@ -158,8 +155,8 @@ function generateSensorData(warehouse: WarehouseData): StorageUnit {
     capacityUsed:
       warehouse.capacityQuintals > 0
         ? Math.round(
-            (warehouse.usedCapacity / warehouse.capacityQuintals) * 100,
-          )
+          (warehouse.usedCapacity / warehouse.capacityQuintals) * 100,
+        )
         : 0,
   }
 }
@@ -224,18 +221,7 @@ function extractPricesFromStateData(
   return prices
 }
 
-function getRiskBadge(level: string) {
-  switch (level) {
-    case "critical":
-      return "bg-red-500 text-white"
-    case "high":
-      return "bg-red-100 text-red-700"
-    case "medium":
-      return "bg-amber-100 text-amber-700"
-    default:
-      return "bg-green-100 text-green-700"
-  }
-}
+
 
 const urgencyConfig = {
   low: {
@@ -302,10 +288,6 @@ const Warehouse: React.FC = () => {
 
   // Monitor tab state
   const [sensorData, setSensorData] = useState<StorageUnit[]>([])
-  const [aiAnalysis, setAiAnalysis] = useState<StorageAnalysisResult | null>(
-    null,
-  )
-  const [analyzing, setAnalyzing] = useState(false)
 
   // Distribution tab state
   const [selectedDistLot, setSelectedDistLot] = useState<LotData | null>(null)
@@ -501,23 +483,7 @@ const Warehouse: React.FC = () => {
     }
   }
 
-  /* ─── Monitor tab: AI analysis ─── */
-  const runAiAnalysis = async () => {
-    if (sensorData.length === 0) {
-      toast.error("No storage units to analyze")
-      return
-    }
-    setAnalyzing(true)
-    try {
-      const result = await analyzeStorageConditions(sensorData)
-      setAiAnalysis(result)
-      toast.success("AI analysis complete")
-    } catch {
-      toast.error("AI analysis failed")
-    } finally {
-      setAnalyzing(false)
-    }
-  }
+
 
   /* ─── Distribution tab: market recommendation ─── */
   const handleDistributionAnalyze = async () => {
@@ -597,10 +563,10 @@ const Warehouse: React.FC = () => {
     selectedWarehouse === "all"
       ? lots
       : lots.filter((l) => {
-          const whId =
-            typeof l.warehouse === "object" ? l.warehouse._id : l.warehouse
-          return whId === selectedWarehouse
-        })
+        const whId =
+          typeof l.warehouse === "object" ? l.warehouse._id : l.warehouse
+        return whId === selectedWarehouse
+      })
 
   // Storage tab: Active = has quantity, History = fully dispatched (qty 0)
   const filteredLots =
@@ -614,7 +580,7 @@ const Warehouse: React.FC = () => {
   const dispatchedLotsCount = warehouseFiltered.filter(
     (l) => l.quantityQuintals <= 0,
   ).length
-  const unresolvedAlerts = alerts.filter((a: AlertData) => !a.isResolved)
+
 
   /* ─── Render ─── */
   return (
@@ -663,33 +629,30 @@ const Warehouse: React.FC = () => {
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => setActiveTab("storage")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === "storage"
-                  ? "bg-[#63A361] text-white"
-                  : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "storage"
+                ? "bg-[#63A361] text-white"
+                : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
+                }`}
             >
               <WarehouseIcon className="w-4 h-4 inline mr-2" />
               My Storage
             </button>
             <button
               onClick={() => setActiveTab("monitor")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === "monitor"
-                  ? "bg-[#63A361] text-white"
-                  : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "monitor"
+                ? "bg-[#63A361] text-white"
+                : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
+                }`}
             >
               <Thermometer className="w-4 h-4 inline mr-2" />
               Storage Monitor
             </button>
             <button
               onClick={() => setActiveTab("distribution")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === "distribution"
-                  ? "bg-[#63A361] text-white"
-                  : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === "distribution"
+                ? "bg-[#63A361] text-white"
+                : "bg-[#FDE7B3]/30 text-[#5B532C] hover:bg-[#FDE7B3]/50"
+                }`}
             >
               <Truck className="w-4 h-4 inline mr-2" />
               Distribution
@@ -779,13 +742,12 @@ const Warehouse: React.FC = () => {
                             </div>
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                               <motion.div
-                                className={`h-full rounded-full ${
-                                  usedPct > 90
-                                    ? "bg-red-400"
-                                    : usedPct > 70
-                                      ? "bg-yellow-400"
-                                      : "bg-[#63A361]"
-                                }`}
+                                className={`h-full rounded-full ${usedPct > 90
+                                  ? "bg-red-400"
+                                  : usedPct > 70
+                                    ? "bg-yellow-400"
+                                    : "bg-[#63A361]"
+                                  }`}
                                 initial={{ width: 0 }}
                                 animate={{ width: `${usedPct}%` }}
                                 transition={{ duration: 0.8 }}
@@ -835,30 +797,27 @@ const Warehouse: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setLotFilter("active")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          lotFilter === "active"
-                            ? "bg-[#63A361] text-white"
-                            : "bg-gray-100 text-[#5B532C]/60 hover:bg-gray-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lotFilter === "active"
+                          ? "bg-[#63A361] text-white"
+                          : "bg-gray-100 text-[#5B532C]/60 hover:bg-gray-200"
+                          }`}
                       >
                         Active Lots
                       </button>
                       <button
                         onClick={() => setLotFilter("dispatched")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                          lotFilter === "dispatched"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-100 text-[#5B532C]/60 hover:bg-gray-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${lotFilter === "dispatched"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-[#5B532C]/60 hover:bg-gray-200"
+                          }`}
                       >
                         Recently Dispatched
                         {dispatchedLotsCount > 0 && (
                           <span
-                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              lotFilter === "dispatched"
-                                ? "bg-white/20 text-white"
-                                : "bg-blue-100 text-blue-700"
-                            }`}
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${lotFilter === "dispatched"
+                              ? "bg-white/20 text-white"
+                              : "bg-blue-100 text-blue-700"
+                              }`}
                           >
                             {dispatchedLotsCount}
                           </span>
@@ -919,76 +878,7 @@ const Warehouse: React.FC = () => {
                   <h2 className="text-lg font-bold text-[#5B532C]">
                     Real-time Storage Conditions
                   </h2>
-                  <button
-                    onClick={runAiAnalysis}
-                    disabled={analyzing}
-                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {analyzing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4" />
-                        AI Analysis
-                      </>
-                    )}
-                  </button>
                 </div>
-
-                {/* Active Alerts */}
-                {unresolvedAlerts.length > 0 && (
-                  <div className="space-y-3">
-                    {unresolvedAlerts.slice(0, 3).map((alert) => (
-                      <SpoilageAlert
-                        key={alert._id}
-                        severity={
-                          alert.severity === "critical" ||
-                          alert.severity === "high"
-                            ? "critical"
-                            : alert.severity === "medium"
-                              ? "warning"
-                              : "info"
-                        }
-                        title={alert.alertType}
-                        message={alert.message}
-                        recommendation={alert.recommendation}
-                        onDismiss={() => {
-                          warehouseService.markAlertRead(alert._id)
-                          setAlerts((prev) =>
-                            prev.filter((a) => a._id !== alert._id),
-                          )
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* AI Analysis Summary */}
-                {aiAnalysis && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-[#5B532C] flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-teal-600" />
-                        AI Risk Assessment
-                      </h3>
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${getRiskBadge(aiAnalysis.overallRisk)}`}
-                      >
-                        {aiAnalysis.overallRisk.toUpperCase()} RISK
-                      </span>
-                    </div>
-                    <p className="text-sm text-[#5B532C]/80">
-                      {aiAnalysis.summary}
-                    </p>
-                  </motion.div>
-                )}
 
                 {/* Storage Unit Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1001,9 +891,7 @@ const Warehouse: React.FC = () => {
                     </div>
                   ) : (
                     sensorData.map((unit, idx) => {
-                      const unitAnalysis = aiAnalysis?.unitAnalyses.find(
-                        (a) => a.unitId === unit.unitId,
-                      )
+
                       return (
                         <motion.div
                           key={unit.unitId}
@@ -1014,13 +902,12 @@ const Warehouse: React.FC = () => {
                         >
                           {/* Unit Header */}
                           <div
-                            className={`p-4 ${
-                              unit.type === "cold_storage"
-                                ? "bg-gradient-to-r from-blue-50 to-cyan-50"
-                                : unit.type === "ventilated"
-                                  ? "bg-gradient-to-r from-green-50 to-emerald-50"
-                                  : "bg-gradient-to-r from-amber-50 to-yellow-50"
-                            }`}
+                            className={`p-4 ${unit.type === "cold_storage"
+                              ? "bg-gradient-to-r from-blue-50 to-cyan-50"
+                              : unit.type === "ventilated"
+                                ? "bg-gradient-to-r from-green-50 to-emerald-50"
+                                : "bg-gradient-to-r from-amber-50 to-yellow-50"
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -1031,13 +918,7 @@ const Warehouse: React.FC = () => {
                                   {unit.type.replace("_", " ")}
                                 </p>
                               </div>
-                              {unitAnalysis && (
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskBadge(unitAnalysis.riskLevel)}`}
-                                >
-                                  {unitAnalysis.riskLevel}
-                                </span>
-                              )}
+
                             </div>
                           </div>
 
@@ -1066,46 +947,6 @@ const Warehouse: React.FC = () => {
                                 color="#f59e0b"
                               />
                             </div>
-
-                            {/* Threshold alerts */}
-                            {(unit.temperature > 30 || unit.humidity > 75) && (
-                              <div className="mb-3">
-                                <SpoilageAlert
-                                  severity={
-                                    unit.temperature > 35 || unit.humidity > 85
-                                      ? "critical"
-                                      : "warning"
-                                  }
-                                  title="Threshold Breach"
-                                  message={`${unit.temperature > 30 ? `Temp: ${unit.temperature}°C` : ""} ${unit.humidity > 75 ? `Humidity: ${unit.humidity}%` : ""}`.trim()}
-                                  recommendation={
-                                    unit.temperature > 30
-                                      ? "Activate cooling"
-                                      : "Activate dehumidifier"
-                                  }
-                                />
-                              </div>
-                            )}
-
-                            {/* AI Recommendations */}
-                            {unitAnalysis &&
-                              unitAnalysis.recommendations.length > 0 && (
-                                <div className="mt-3 p-3 bg-teal-50 rounded-lg border border-teal-100">
-                                  <p className="text-xs font-semibold text-teal-700 mb-1">
-                                    AI Recommendations
-                                  </p>
-                                  {unitAnalysis.recommendations
-                                    .slice(0, 2)
-                                    .map((rec, i) => (
-                                      <p
-                                        key={i}
-                                        className="text-xs text-teal-600"
-                                      >
-                                        • {rec}
-                                      </p>
-                                    ))}
-                                </div>
-                              )}
 
                             {/* Stored produce */}
                             {unit.produceStored.length > 0 && (
@@ -1161,13 +1002,12 @@ const Warehouse: React.FC = () => {
                                   {lot.currentCondition}
                                 </span>
                                 <span
-                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    lot.status === "stored"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : lot.status === "dispatched"
-                                        ? "bg-green-50 text-green-700"
-                                        : "bg-gray-50 text-gray-700"
-                                  }`}
+                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${lot.status === "stored"
+                                    ? "bg-blue-50 text-blue-700"
+                                    : lot.status === "dispatched"
+                                      ? "bg-green-50 text-green-700"
+                                      : "bg-gray-50 text-gray-700"
+                                    }`}
                                 >
                                   {lot.status}
                                 </span>
@@ -1202,24 +1042,22 @@ const Warehouse: React.FC = () => {
                                 </p>
                                 <div className="w-24 bg-gray-200 rounded-full h-2.5">
                                   <div
-                                    className={`h-2.5 rounded-full transition-all ${
-                                      shelfLifePct > 50
-                                        ? "bg-green-500"
-                                        : shelfLifePct > 25
-                                          ? "bg-amber-500"
-                                          : "bg-red-500"
-                                    }`}
+                                    className={`h-2.5 rounded-full transition-all ${shelfLifePct > 50
+                                      ? "bg-green-500"
+                                      : shelfLifePct > 25
+                                        ? "bg-amber-500"
+                                        : "bg-red-500"
+                                      }`}
                                     style={{ width: `${shelfLifePct}%` }}
                                   />
                                 </div>
                                 <p
-                                  className={`text-xs font-medium mt-1 ${
-                                    shelfLifePct > 50
-                                      ? "text-green-600"
-                                      : shelfLifePct > 25
-                                        ? "text-amber-600"
-                                        : "text-red-600"
-                                  }`}
+                                  className={`text-xs font-medium mt-1 ${shelfLifePct > 50
+                                    ? "text-green-600"
+                                    : shelfLifePct > 25
+                                      ? "text-amber-600"
+                                      : "text-red-600"
+                                    }`}
                                 >
                                   {shelfLifePct}% remaining
                                 </p>
@@ -1307,24 +1145,22 @@ const Warehouse: React.FC = () => {
                                   setDispatchQty(String(lot.quantityQuintals))
                                   setDistResult(null)
                                 }}
-                                className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                                  isSelected
-                                    ? "border-[#63A361] bg-[#63A361]/5"
-                                    : "border-[#5B532C]/10 hover:border-[#FFC50F]/50"
-                                }`}
+                                className={`w-full text-left p-3 rounded-lg border-2 transition-all ${isSelected
+                                  ? "border-[#63A361] bg-[#63A361]/5"
+                                  : "border-[#5B532C]/10 hover:border-[#FFC50F]/50"
+                                  }`}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium text-[#5B532C]">
                                     {lot.cropName}
                                   </span>
                                   <span
-                                    className={`text-xs px-2 py-0.5 rounded-full ${
-                                      daysStored > 14
-                                        ? "bg-red-100 text-red-700"
-                                        : daysStored > 7
-                                          ? "bg-amber-100 text-amber-700"
-                                          : "bg-green-100 text-green-700"
-                                    }`}
+                                    className={`text-xs px-2 py-0.5 rounded-full ${daysStored > 14
+                                      ? "bg-red-100 text-red-700"
+                                      : daysStored > 7
+                                        ? "bg-amber-100 text-amber-700"
+                                        : "bg-green-100 text-green-700"
+                                      }`}
                                   >
                                     {daysStored}d stored
                                   </span>
@@ -1366,7 +1202,7 @@ const Warehouse: React.FC = () => {
                                 const warehouseCity =
                                   typeof selectedDistLot.warehouse === "object"
                                     ? selectedDistLot.warehouse.location
-                                        ?.city || ""
+                                      ?.city || ""
                                     : ""
                                 const warehouseState =
                                   getStateForCity(warehouseCity)
@@ -1381,11 +1217,10 @@ const Warehouse: React.FC = () => {
                                       setMarketScope(scope)
                                       setDistResult(null)
                                     }}
-                                    className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-                                      marketScope === scope
-                                        ? "bg-[#63A361] text-white"
-                                        : "bg-white text-[#5B532C]/60 hover:bg-gray-50"
-                                    }`}
+                                    className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${marketScope === scope
+                                      ? "bg-[#63A361] text-white"
+                                      : "bg-white text-[#5B532C]/60 hover:bg-gray-50"
+                                      }`}
                                   >
                                     {labels[scope]}
                                   </button>
@@ -1506,20 +1341,18 @@ const Warehouse: React.FC = () => {
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className={`p-4 rounded-lg border-2 ${
-                                      idx === 0
-                                        ? "border-[#63A361] bg-[#63A361]/5"
-                                        : "border-[#5B532C]/10"
-                                    }`}
+                                    className={`p-4 rounded-lg border-2 ${idx === 0
+                                      ? "border-[#63A361] bg-[#63A361]/5"
+                                      : "border-[#5B532C]/10"
+                                      }`}
                                   >
                                     <div className="flex items-start justify-between">
                                       <div className="flex items-start gap-3">
                                         <div
-                                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                            idx === 0
-                                              ? "bg-[#63A361] text-white"
-                                              : "bg-[#FDE7B3] text-[#5B532C]"
-                                          }`}
+                                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0
+                                            ? "bg-[#63A361] text-white"
+                                            : "bg-[#FDE7B3] text-[#5B532C]"
+                                            }`}
                                         >
                                           {idx + 1}
                                         </div>
@@ -1581,22 +1414,20 @@ const Warehouse: React.FC = () => {
                                     {market.spoilageRisk && (
                                       <div className="mt-2 flex items-center gap-1.5">
                                         <AlertTriangle
-                                          className={`w-3.5 h-3.5 ${
-                                            market.spoilageRisk === "high"
-                                              ? "text-red-500"
-                                              : market.spoilageRisk === "medium"
-                                                ? "text-amber-500"
-                                                : "text-green-500"
-                                          }`}
+                                          className={`w-3.5 h-3.5 ${market.spoilageRisk === "high"
+                                            ? "text-red-500"
+                                            : market.spoilageRisk === "medium"
+                                              ? "text-amber-500"
+                                              : "text-green-500"
+                                            }`}
                                         />
                                         <span
-                                          className={`text-xs ${
-                                            market.spoilageRisk === "high"
-                                              ? "text-red-600"
-                                              : market.spoilageRisk === "medium"
-                                                ? "text-amber-600"
-                                                : "text-green-600"
-                                          }`}
+                                          className={`text-xs ${market.spoilageRisk === "high"
+                                            ? "text-red-600"
+                                            : market.spoilageRisk === "medium"
+                                              ? "text-amber-600"
+                                              : "text-green-600"
+                                            }`}
                                         >
                                           Spoilage risk: {market.spoilageRisk}
                                         </span>
@@ -1880,7 +1711,7 @@ const Warehouse: React.FC = () => {
             if (dispatchAlert) {
               try {
                 await warehouseService.markAlertRead(dispatchAlert._id)
-              } catch {}
+              } catch { }
             }
             setShowDispatchBar(false)
           }}
