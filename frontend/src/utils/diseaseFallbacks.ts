@@ -1,66 +1,65 @@
 import { DiseaseDetectionResult } from '../ai/diseaseDetectionService';
 
-export const GENERIC_DISEASE_TREATMENTS = {
-  fungal: [
-    'Apply copper-based fungicide',
-    'Improve air circulation',
-    'Reduce leaf wetness',
-    'Remove infected plant parts'
+export const GENERIC_STORAGE_TREATMENTS = {
+  mold: [
+    'Remove affected produce and isolate clean stock',
+    'Improve ventilation and reduce humidity',
+    'Apply food-grade anti-fungal treatment',
+    'Clean and sanitize storage surfaces'
   ],
-  bacterial: [
-    'Use copper-based bactericides',
-    'Avoid overhead irrigation',
-    'Practice crop rotation',
-    'Remove infected debris'
+  rot: [
+    'Immediately remove rotting produce',
+    'Check and adjust storage temperature',
+    'Increase airflow around stored items',
+    'Inspect adjacent produce for early signs'
   ],
-  viral: [
-    'Remove infected plants',
-    'Control insect vectors',
-    'Use disease-resistant varieties',
-    'Sanitize tools and equipment'
+  moisture_damage: [
+    'Fix leaks or condensation sources',
+    'Deploy dehumidifiers or desiccants',
+    'Re-sort and dry affected produce',
+    'Improve drainage in storage area'
   ]
 };
 
 export const COMMON_PREVENTIVE_MEASURES = [
-  'Maintain proper plant spacing',
-  'Practice crop rotation',
-  'Keep tools sanitized',
-  'Monitor plants regularly',
-  'Maintain optimal soil pH',
-  'Use disease-resistant varieties',
-  'Implement proper irrigation practices',
-  'Remove plant debris promptly'
+  'Maintain optimal temperature for stored produce',
+  'Monitor humidity levels regularly',
+  'Implement FIFO (First In, First Out) rotation',
+  'Ensure adequate spacing between storage units',
+  'Conduct regular quality inspections',
+  'Keep storage areas clean and sanitized',
+  'Install temperature and humidity sensors',
+  'Train staff on proper handling practices'
 ];
 
-export const getFallbackResponse = (imageAnalysis?: { 
-  isLeafSpot?: boolean, 
-  isWilting?: boolean, 
-  isDiscolored?: boolean 
+export const getFallbackResponse = (imageAnalysis?: {
+  isLeafSpot?: boolean,
+  isWilting?: boolean,
+  isDiscolored?: boolean
 }): DiseaseDetectionResult => {
   const now = new Date().toISOString();
-  
+
   // Default fallback
   if (!imageAnalysis) {
     return {
       confidence: 85,
-      disease: "Potential Plant Disease",
+      disease: "Potential Storage Spoilage",
       severity: "medium",
-      treatment: "Apply general disease management practices including fungicide application and improving plant conditions.",
+      treatment: "Inspect stored produce for visible signs of spoilage. Check storage temperature and humidity levels. Separate any affected items.",
       preventiveMeasures: COMMON_PREVENTIVE_MEASURES,
       detectedAt: now
     };
   }
 
-  // Attempt basic visual analysis
   const { isLeafSpot, isWilting, isDiscolored } = imageAnalysis;
-  
+
   if (isLeafSpot) {
     return {
       confidence: 82,
-      disease: "Leaf Spot Disease",
+      disease: "Mold or Fungal Growth",
       severity: "medium",
-      treatment: "Apply appropriate fungicide. Remove and destroy infected leaves. Improve air circulation.",
-      preventiveMeasures: [...GENERIC_DISEASE_TREATMENTS.fungal, ...COMMON_PREVENTIVE_MEASURES],
+      treatment: "Remove affected produce. Improve ventilation. Apply food-grade anti-fungal treatment to storage area.",
+      preventiveMeasures: [...GENERIC_STORAGE_TREATMENTS.mold, ...COMMON_PREVENTIVE_MEASURES],
       detectedAt: now
     };
   }
@@ -68,10 +67,10 @@ export const getFallbackResponse = (imageAnalysis?: {
   if (isWilting) {
     return {
       confidence: 80,
-      disease: "Possible Bacterial Wilt",
+      disease: "Advanced Rot or Decay",
       severity: "high",
-      treatment: "Remove infected plants. Sterilize soil if possible. Apply copper-based bactericide.",
-      preventiveMeasures: [...GENERIC_DISEASE_TREATMENTS.bacterial, ...COMMON_PREVENTIVE_MEASURES],
+      treatment: "Immediately remove rotting produce. Sanitize storage area. Check cold chain integrity.",
+      preventiveMeasures: [...GENERIC_STORAGE_TREATMENTS.rot, ...COMMON_PREVENTIVE_MEASURES],
       detectedAt: now
     };
   }
@@ -79,20 +78,20 @@ export const getFallbackResponse = (imageAnalysis?: {
   if (isDiscolored) {
     return {
       confidence: 81,
-      disease: "Nutrient Deficiency or Viral Infection",
+      disease: "Moisture Damage or Early Spoilage",
       severity: "medium",
-      treatment: "Test soil pH and nutrients. Apply appropriate fertilizer. Monitor for viral symptoms.",
-      preventiveMeasures: [...GENERIC_DISEASE_TREATMENTS.viral, ...COMMON_PREVENTIVE_MEASURES],
+      treatment: "Check for condensation or leaks. Adjust humidity controls. Sort and separate affected produce.",
+      preventiveMeasures: [...GENERIC_STORAGE_TREATMENTS.moisture_damage, ...COMMON_PREVENTIVE_MEASURES],
       detectedAt: now
     };
   }
 
   return {
     confidence: 80,
-    disease: "Unspecified Plant Stress",
+    disease: "Unspecified Storage Issue",
     severity: "medium",
-    treatment: "Monitor plant conditions. Apply broad-spectrum fungicide if symptoms persist.",
+    treatment: "Monitor storage conditions closely. Conduct manual inspection of produce quality.",
     preventiveMeasures: COMMON_PREVENTIVE_MEASURES,
     detectedAt: now
   };
-}; 
+};

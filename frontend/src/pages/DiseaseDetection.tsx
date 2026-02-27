@@ -197,7 +197,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       setCurrentStep(0);
 
       // ── Build config ──────────────────────────────────────────────────
-      const config: DiseasePromptConfig = { cropType, severityLevel };
+      const config: DiseasePromptConfig = { cropType, severityLevel, context: 'storage' };
       console.log(TAG, `Config:`, config);
 
       // ── Start API call IMMEDIATELY ────────────────────────────────────
@@ -209,10 +209,10 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       // ── Progress animation (runs while API is in-flight) ─────────────
       const steps = [
         { message: "Compressing and uploading image…", duration: 1500 },
-        { message: "Performing image analysis…", duration: 3000 },
-        { message: "Running AI disease model…", duration: 4000 },
-        { message: "Analyzing disease patterns…", duration: 3000 },
-        { message: "Generating recommendations…", duration: 2000 },
+        { message: "Scanning stored produce…", duration: 3000 },
+        { message: "Running AI spoilage model…", duration: 4000 },
+        { message: "Assessing storage conditions…", duration: 3000 },
+        { message: "Generating storage recommendations…", duration: 2000 },
         { message: "Waiting for AI results…", duration: 60000 }, // long step - waits for API
       ];
 
@@ -296,7 +296,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       await new Promise((r) => setTimeout(r, 500));
       addProcessingStep("Analysis complete!");
       setAnalysisResult(result);
-      toast.success('Disease analysis completed!', { duration: 3000 });
+      toast.success('Spoilage analysis completed!', { duration: 3000 });
 
       // Create a lightweight preview (to avoid storing very large images)
       const createPreview = async (dataUrl: string, maxW = 600, maxH = 600): Promise<string> => {
@@ -381,8 +381,8 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
   };
   const solutions = [
     {
-      title: "Chemical Solutions",
-      icon: Microscope,
+      title: "Immediate Actions",
+      icon: Zap,
       solutions: analysisResult?.organicTreatments || [
         "Solution 1",
         "Solution 2",
@@ -391,8 +391,8 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       color: "blue",
     },
     {
-      title: "Organic Solutions",
-      icon: Leaf,
+      title: "Storage Optimization",
+      icon: Gauge,
       solutions: analysisResult?.ipmStrategies || [
         "Solution 1",
         "Solution 2",
@@ -401,7 +401,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
       color: "green",
     },
     {
-      title: "Preventive Measures",
+      title: "Loss Prevention",
       icon: Shield,
       solutions: analysisResult?.preventionPlan || [
         "Solution 1",
@@ -429,7 +429,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
           >
             <div className="w-2 h-2 bg-[#63A361] rounded-full animate-pulse" />
             <span className="text-sm font-semibold text-[#63A361]">
-              AI-Powered Monitoring
+              AI-Powered Warehouse Monitoring
             </span>
           </motion.div>
 
@@ -439,7 +439,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
             transition={{ delay: 0.1 }}
             className="text-3xl font-extrabold text-[#5B532C] md:text-4xl"
           >
-            Smart Plant Health Analysis
+            Warehouse Spoilage Detection
           </motion.h1>
 
           <motion.p
@@ -448,8 +448,8 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
             transition={{ delay: 0.2 }}
             className="mt-3 text-sm text-[#5B532C]/70 md:mt-4 md:text-base"
           >
-            Advanced AI-powered plant Monitoring with real-time
-            monitoring and treatment recommendations
+            Detect spoilage in stored produce, monitor storage conditions,
+            and get actionable recommendations to minimize post-harvest losses
           </motion.p>
 
           {/* API Mode Selector */}
@@ -545,7 +545,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                   <div className="relative h-64 w-full overflow-hidden rounded-lg shadow-md aspect-[4/3]">
                     <img
                       src={image}
-                      alt="Uploaded plant"
+                      alt="Uploaded produce"
                       className="absolute inset-0 w-full h-full object-contain"
                     />
                     <motion.button
@@ -590,10 +590,10 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
               className="mb-8 p-8 flex flex-col items-center justify-center text-center bg-white rounded-xl shadow-lg border border-gray-200"
             >
               <h3 className="text-2xl font-bold text-gray-900">
-                Analyzing Plant Health
+                Analyzing Storage Conditions
               </h3>
               <p className="mt-2 mb-8 text-base text-gray-600">
-                Please wait while our AI examines your image...
+                Please wait while our AI inspects the stored produce...
               </p>
               {/* Circular Progress Indicator with Animated Icon */}
               <div className="relative w-40 h-40 mb-6">
@@ -731,7 +731,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
               >
                 <CheckCircle2 className="mr-2 w-5 h-5 text-[#63A361]" />
                 <span className="font-medium text-[#63A361]">
-                  Disease Analysis completed successfully
+                  Spoilage Analysis completed successfully
                 </span>
               </motion.div>
 
@@ -749,7 +749,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                       <Microscope className="w-6 h-6 text-red-600" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">
-                      Disease Detected
+                      Spoilage Detected
                     </h3>
                   </div>
                   <div className="text-center">
@@ -834,7 +834,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                       <Clock className="w-6 h-6 text-orange-600" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">
-                      Treatment Urgency
+                      Action Urgency
                     </h3>
                   </div>
                   <div className="text-center">
@@ -848,7 +848,47 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                 </motion.div>
               </div>
 
-              {/* Disease Progression Chart */}
+              {/* Storage Assessment - Warehouse Value Cards */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 }}
+                className="p-6 bg-white rounded-2xl border shadow-xl backdrop-blur-sm border-gray-200"
+              >
+                <div className="flex gap-3 items-center mb-6">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Activity className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Storage Assessment
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="p-4 rounded-lg bg-indigo-50 border border-indigo-200 text-center">
+                    <Gauge className="w-8 h-8 text-indigo-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-1">Storage Condition</p>
+                    <p className="text-lg font-bold text-indigo-600 capitalize">
+                      {(analysisResult as any).storageCondition || "Fair"}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-teal-50 border border-teal-200 text-center">
+                    <Clock className="w-8 h-8 text-teal-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-1">Remaining Shelf Life</p>
+                    <p className="text-lg font-bold text-teal-600">
+                      {(analysisResult as any).remainingShelfLife || "Needs assessment"}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                    <AlertTriangle className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-1">Spoilage Type</p>
+                    <p className="text-lg font-bold text-amber-600 capitalize">
+                      {((analysisResult as any).spoilageType || "none").replace(/_/g, " ")}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Spoilage Progression Chart */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -860,7 +900,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                     <TrendingUp className="w-5 h-5 text-red-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Disease Progression Forecast
+                    Spoilage Progression Forecast
                   </h3>
                 </div>
                 <div className="h-80">
@@ -880,7 +920,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                         fill="#ef4444"
                         fillOpacity={0.3}
                         strokeWidth={3}
-                        name="Disease Severity (%)"
+                        name="Spoilage Severity (%)"
                       />
                       <Area
                         type="monotone"
@@ -907,7 +947,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                     <Activity className="w-5 h-5 text-blue-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Environmental Conditions
+                    Storage Environment Conditions
                   </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -927,11 +967,11 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                           {factor.factor.toLowerCase().includes("humidity") && (
                             <Droplets className="w-4 h-4 text-blue-600" />
                           )}
-                          {factor.factor.toLowerCase().includes("soil") && (
-                            <Gauge className="w-4 h-4 text-green-600" />
+                          {(factor.factor.toLowerCase().includes("soil") || factor.factor.toLowerCase().includes("ventilation")) && (
+                            <Wind className="w-4 h-4 text-green-600" />
                           )}
-                          {factor.factor.toLowerCase().includes("light") && (
-                            <Sun className="w-4 h-4 text-yellow-600" />
+                          {(factor.factor.toLowerCase().includes("light") || factor.factor.toLowerCase().includes("density") || factor.factor.toLowerCase().includes("storage")) && (
+                            <Gauge className="w-4 h-4 text-yellow-600" />
                           )}
                           <span className="text-sm font-medium text-gray-900 capitalize">
                             {factor.factor}
@@ -970,13 +1010,13 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                     <Calendar className="w-5 h-5 text-green-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Treatment Timeline & Impact
+                    Action Timeline & Loss Estimate
                   </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                   <div className="text-center p-4 rounded-lg bg-red-50 border border-red-200">
                     <Clock className="w-8 h-8 text-red-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-1">Time to Treat</p>
+                    <p className="text-sm text-gray-600 mb-1">Time to Act</p>
                     <p className="text-lg font-bold text-red-600">
                       {analysisResult.timeToTreat}
                     </p>
@@ -984,7 +1024,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                   <div className="text-center p-4 rounded-lg bg-green-50 border border-green-200">
                     <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-1">
-                      Estimated Recovery
+                      Shelf Life Extension
                     </p>
                     <p className="text-lg font-bold text-green-600">
                       {analysisResult.estimatedRecovery}
@@ -992,7 +1032,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                   </div>
                   <div className="text-center p-4 rounded-lg bg-orange-50 border border-orange-200">
                     <TrendingUp className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-1">Yield Impact</p>
+                    <p className="text-sm text-gray-600 mb-1">Loss Estimate</p>
                     <p className="text-lg font-bold text-orange-600">
                       {analysisResult.yieldImpact}
                     </p>
@@ -1091,7 +1131,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                     <div className="flex gap-2 items-center mb-2">
                       <TrendingUp className="w-4 h-4 text-orange-600" />
                       <p className="text-sm font-medium text-gray-700">
-                        Disease Progression
+                        Spoilage Progression
                       </p>
                     </div>
                     <div className="text-2xl font-bold text-orange-600 mb-1">
@@ -1107,7 +1147,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                     <div className="flex gap-2 items-center mb-2">
                       <Gauge className="w-4 h-4 text-blue-600" />
                       <p className="text-sm font-medium text-gray-700">
-                        Environmental
+                        Storage Environment
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -1132,7 +1172,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
                         </span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Soil</span>
+                        <span className="text-gray-500">Moisture</span>
                         <span className="font-medium">
                           {
                             analysisResult.realTimeMetrics
@@ -1162,7 +1202,7 @@ const DiseaseDetection: React.FC<DiseaseDetectionProps> = ({
               >
                 <Calendar className="mr-2 w-5 h-5 text-[#63A361]" />
                 <span className="font-medium text-[#63A361]">
-                  Next Analysis:{" "}
+                  Next Inspection:{" "}
                   {new Date(
                     Date.now() + 7 * 24 * 60 * 60 * 1000,
                   ).toLocaleDateString("en-US", {

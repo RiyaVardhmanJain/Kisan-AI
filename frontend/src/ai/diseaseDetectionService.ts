@@ -114,37 +114,37 @@ interface GeminiResponse {
 
 // Default response structure to ensure type safety
 const DEFAULT_RESPONSE: DiseaseAnalysisResult = {
-  cropName: "Unknown Crop",
-  diseaseName: "Unknown Disease",
+  cropName: "Unknown Produce",
+  diseaseName: "Unknown Spoilage",
   timeToTreat: "Immediate",
-  estimatedRecovery: "2-4 weeks",
-  yieldImpact: "Moderate",
+  estimatedRecovery: "3-7 days shelf life extension",
+  yieldImpact: "Moderate loss estimated",
   severityLevel: "medium",
-  symptomDescription: "Symptoms detected but analysis incomplete",
+  symptomDescription: "Spoilage indicators detected but analysis incomplete",
   environmentalFactors: [
     {
       factor: "Temperature",
       currentValue: "25°C",
-      optimalRange: "20-30°C",
-      status: "optimal"
+      optimalRange: "2-8°C (cold) / 15-25°C (dry)",
+      status: "warning"
     },
     {
       factor: "Humidity",
-      currentValue: "60%",
-      optimalRange: "50-70%",
-      status: "optimal"
+      currentValue: "70%",
+      optimalRange: "55-65%",
+      status: "warning"
     },
     {
-      factor: "Soil Moisture",
-      currentValue: "40%",
-      optimalRange: "30-50%",
-      status: "optimal"
+      factor: "Ventilation",
+      currentValue: "Low",
+      optimalRange: "Adequate airflow",
+      status: "warning"
     },
     {
-      factor: "Light Exposure",
-      currentValue: "Partial Sun",
-      optimalRange: "Full to Partial Sun",
-      status: "optimal"
+      factor: "Storage Density",
+      currentValue: "High",
+      optimalRange: "Moderate with spacing",
+      status: "warning"
     }
   ],
   realTimeMetrics: {
@@ -159,28 +159,28 @@ const DEFAULT_RESPONSE: DiseaseAnalysisResult = {
     },
     environmentalConditions: {
       temperature: 25,
-      humidity: 60,
+      humidity: 70,
       soilMoisture: 40,
       lastUpdated: new Date().toLocaleDateString()
     }
   },
   organicTreatments: [
-    "Apply neem oil spray weekly",
-    "Use copper-based fungicide",
-    "Improve air circulation"
+    "Separate affected produce immediately",
+    "Improve ventilation in storage area",
+    "Apply food-grade preservative coating"
   ],
   ipmStrategies: [
-    "Monitor plant health daily",
-    "Use biological control agents",
-    "Implement crop rotation"
+    "Install humidity monitoring sensors",
+    "Implement FIFO stock rotation",
+    "Use biological pest control agents"
   ],
   preventionPlan: [
-    "Ensure proper drainage",
-    "Maintain optimal humidity levels",
-    "Regular plant inspection"
+    "Maintain optimal temperature and humidity",
+    "Regular quality inspection schedule",
+    "Ensure proper spacing between storage units"
   ],
   confidenceLevel: 75,
-  diagnosisSummary: "Disease analysis completed with moderate confidence. Follow recommended treatment protocols."
+  diagnosisSummary: "Storage spoilage analysis completed with moderate confidence. Follow recommended storage protocols to minimize post-harvest losses."
 };
 
 const DEFAULT_STORAGE_RESPONSE: SpoilageAnalysisResult = {
