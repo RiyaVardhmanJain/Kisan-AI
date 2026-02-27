@@ -109,6 +109,15 @@ export const warehouseService = {
         return res.data.lot;
     },
 
+    async deleteLot(id: string): Promise<void> {
+        await api.delete(`/lots/${id}`);
+    },
+
+    async shiftLot(lotId: string, targetWarehouseId: string): Promise<LotData> {
+        const res = await api.put(`/lots/${lotId}/shift`, { targetWarehouseId });
+        return res.data.lot;
+    },
+
     async getLotTimeline(id: string): Promise<StorageEventData[]> {
         const res = await api.get(`/lots/${id}/timeline`);
         return res.data.events;
@@ -138,20 +147,26 @@ export const warehouseService = {
         return res.data.alert;
     },
 
-    /** Orchestrates dispatch: updates lot status → logs timeline event → resolves alert (if any) */
+    /** Orchestrates dispatch: updates lot status + quantity → logs timeline event → resolves alert (if any) */
     async dispatchLot(
         lotId: string,
         opts: {
             quantityDispatched: number;
+            totalQuantity: number;
             market: string;
             pricePerQuintal?: number;
             alertId?: string;
         }
     ): Promise<void> {
-        const { quantityDispatched, market, pricePerQuintal, alertId } = opts;
+        const { quantityDispatched, totalQuantity, market, pricePerQuintal, alertId } = opts;
 
-        // 1. Mark lot as dispatched
-        await this.updateLot(lotId, { status: 'dispatched' });
+        // 1. Compute remaining & status
+        const remaining = totalQuantity - quantityDispatched;
+        const newStatus = remaining <= 0 ? 'dispatched' : 'partially_dispatched';
+        await this.updateLot(lotId, {
+            status: newStatus,
+            quantityQuintals: Math.max(0, remaining),
+        } as any);
 
         // 2. Log traceability event
         const revenue = pricePerQuintal
