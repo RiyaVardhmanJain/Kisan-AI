@@ -39,7 +39,7 @@
 - **Google Gemini 2.5 Pro** — Disease & Storage image analysis
 - **Groq API + Kimi K2** — Chatbot, eConsultant, Market intelligence
 - **OpenWeatherMap** — Real-time weather data
-- **Mandi price data** — Maharashtra markets (JSON-based)
+- **Mandi price data** — Niti-Ayog API (JSON-based)
 
 ---
 
