@@ -40,47 +40,11 @@ import {
   type StatePrice,
 } from "../ai/marketService"
 
-// State data for distribution
+// State data for distribution — Maharashtra only
 import mahaData from "../data/maha.json"
-import karnatakaData from "../data/karnataka.json"
-import keralaData from "../data/kerala.json"
-import punjabData from "../data/punjab.json"
-import tamilnaduData from "../data/tamilnadu.json"
-import andraData from "../data/andra.json"
-import teleganaData from "../data/telegana.json"
-import cityData from "../data/cityData.json"
 
-// ─── City → State mapping (built once from cityData.json) ───
 const STATE_DATA_MAP: Record<string, { data: any; label: string }> = {
   Maharashtra: { data: mahaData, label: "Maharashtra" },
-  Karnataka: { data: karnatakaData, label: "Karnataka" },
-  Kerala: { data: keralaData, label: "Kerala" },
-  Punjab: { data: punjabData, label: "Punjab" },
-  "Tamil Nadu": { data: tamilnaduData, label: "Tamil Nadu" },
-  "Andhra Pradesh": { data: andraData, label: "Andhra Pradesh" },
-  Telangana: { data: teleganaData, label: "Telangana" },
-}
-
-const CITY_TO_STATE: Record<string, string> = {}
-for (const [key, cities] of Object.entries(cityData)) {
-  if (key === "crops") continue
-  let stateName = ""
-  if (key === "mahacities") stateName = "Maharashtra"
-  else if (key === "andra cities") stateName = "Andhra Pradesh"
-  else if (key === "punjab cities") stateName = "Punjab"
-  else if (key === "karnataka cities") stateName = "Karnataka"
-  else if (key === "kerala cities") stateName = "Kerala"
-  else if (key === "tamilnadu cities") stateName = "Tamil Nadu"
-  else if (key === "telangana cities") stateName = "Telangana"
-  if (stateName && Array.isArray(cities)) {
-    for (const city of cities) {
-      CITY_TO_STATE[city.toLowerCase()] = stateName
-    }
-  }
-}
-
-function getStateForCity(cityName: string): string | null {
-  return CITY_TO_STATE[cityName.toLowerCase()] || null
 }
 
 /* ─── Warehouse type badge config ─── */
@@ -294,7 +258,7 @@ const Warehouse: React.FC = () => {
   const [dispatchQty, setDispatchQty] = useState("")
   const [distAnalyzing, setDistAnalyzing] = useState(false)
   const [distResult, setDistResult] = useState<DistributionResult | null>(null)
-  const [marketScope, setMarketScope] = useState<"all" | "state">("all")
+
 
   // Alert → Dispatch flow state
   const [dispatchAlert, setDispatchAlert] = useState<AlertData | null>(null)
@@ -494,37 +458,15 @@ const Warehouse: React.FC = () => {
     setDistAnalyzing(true)
     try {
       const cropName = selectedDistLot.cropName
-      const warehouseCity =
-        typeof selectedDistLot.warehouse === "object"
-          ? selectedDistLot.warehouse.location?.city || ""
-          : ""
-      const warehouseState = getStateForCity(warehouseCity)
 
+      // Always use Maharashtra market data
       let allPrices: StatePrice[] = []
-
-      if (marketScope === "state") {
-        // Markets from the same state as the warehouse
-        if (warehouseState && STATE_DATA_MAP[warehouseState]) {
-          allPrices = extractPricesFromStateData(
-            STATE_DATA_MAP[warehouseState].data,
-            warehouseState,
-            cropName,
-          )
-        }
-        if (allPrices.length === 0) {
-          toast.error(
-            `No state market data found for ${cropName} in ${warehouseState || "unknown state"}. Try 'All India'.`,
-          )
-          setDistAnalyzing(false)
-          return
-        }
-      } else {
-        // All states
-        for (const [stateName, { data }] of Object.entries(STATE_DATA_MAP)) {
-          allPrices.push(
-            ...extractPricesFromStateData(data, stateName, cropName),
-          )
-        }
+      if (STATE_DATA_MAP["Maharashtra"]) {
+        allPrices = extractPricesFromStateData(
+          STATE_DATA_MAP["Maharashtra"].data,
+          "Maharashtra",
+          cropName,
+        )
       }
 
       if (allPrices.length === 0) {
@@ -1192,42 +1134,7 @@ const Warehouse: React.FC = () => {
                             />
                           </div>
 
-                          {/* Market Scope Tabs */}
-                          <div>
-                            <label className="block text-xs font-medium text-[#5B532C]/50 mb-1.5">
-                              Market Scope
-                            </label>
-                            <div className="flex rounded-lg border border-[#5B532C]/15 overflow-hidden">
-                              {(["all", "state"] as const).map((scope) => {
-                                const warehouseCity =
-                                  typeof selectedDistLot.warehouse === "object"
-                                    ? selectedDistLot.warehouse.location
-                                      ?.city || ""
-                                    : ""
-                                const warehouseState =
-                                  getStateForCity(warehouseCity)
-                                const labels: Record<string, string> = {
-                                  all: "All India",
-                                  state: warehouseState || "State",
-                                }
-                                return (
-                                  <button
-                                    key={scope}
-                                    onClick={() => {
-                                      setMarketScope(scope)
-                                      setDistResult(null)
-                                    }}
-                                    className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${marketScope === scope
-                                      ? "bg-[#63A361] text-white"
-                                      : "bg-white text-[#5B532C]/60 hover:bg-gray-50"
-                                      }`}
-                                  >
-                                    {labels[scope]}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
+
 
                           <button
                             onClick={handleDistributionAnalyze}
@@ -1282,7 +1189,7 @@ const Warehouse: React.FC = () => {
                         >
                           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#63A361] mb-4" />
                           <p className="text-[#5B532C]/70">
-                            Analyzing markets across 7 states...
+                            Analyzing Maharashtra markets...
                           </p>
                         </motion.div>
                       )}
