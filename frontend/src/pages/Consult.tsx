@@ -105,6 +105,21 @@ const Consult: React.FC = () => {
     return 'bg-[#63A361]';
   };
 
+  // Show storage section only for harvest/post-harvest phases
+  const isHarvestOrPostHarvestPhase = (phase: string): boolean => {
+    const lower = phase.toLowerCase();
+    return (
+      lower.includes('harvest') ||
+      lower.includes('post-harvest') ||
+      lower.includes('post harvest') ||
+      lower.includes('ripen') ||
+      lower.includes('maturation') ||
+      lower.includes('maturity') ||
+      lower.includes('ready') ||
+      lower.includes('storage')
+    );
+  };
+
   return (
     <div className="min-h-screen bg-white py-8 px-4">
       <Toaster position="top-center" />
@@ -453,8 +468,8 @@ const Consult: React.FC = () => {
                 </div>
               </div>
 
-              {/* Storage Strategy */}
-              {analysis.storageStrategy && (
+              {/* Storage Strategy — only for harvest/post-harvest phases */}
+              {isHarvestOrPostHarvestPhase(formData.currentPhase) && analysis.storageStrategy && (
                 <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-6 shadow-lg border border-teal-200">
                   <h3 className="text-xl font-bold text-[#5B532C] mb-4 flex items-center gap-2">
                     <Warehouse className="w-6 h-6 text-teal-600" />
@@ -689,28 +704,30 @@ const Consult: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Storage */}
-                <div className="mt-4 p-4 bg-[#FDE7B3]/50 rounded-lg border border-[#5B532C]/10">
-                  <h4 className="font-semibold text-[#5B532C] mb-2">Storage Strategy</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <p className="text-xs text-[#5B532C]/70">Method</p>
-                      <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.method}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#5B532C]/70">Duration</p>
-                      <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.duration}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#5B532C]/70">Cost</p>
-                      <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.costPerQuintal}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#5B532C]/70">Advantage</p>
-                      <p className="font-medium text-[#63A361]">{analysis.valueAddition.storageRecommendations.priceAdvantage}</p>
+                {/* Storage Recommendations — only for harvest/post-harvest */}
+                {isHarvestOrPostHarvestPhase(formData.currentPhase) && (
+                  <div className="mt-4 p-4 bg-[#FDE7B3]/50 rounded-lg border border-[#5B532C]/10">
+                    <h4 className="font-semibold text-[#5B532C] mb-2">Storage Strategy</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <p className="text-xs text-[#5B532C]/70">Method</p>
+                        <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.method}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#5B532C]/70">Duration</p>
+                        <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.duration}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#5B532C]/70">Cost</p>
+                        <p className="font-medium text-[#5B532C]">{analysis.valueAddition.storageRecommendations.costPerQuintal}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#5B532C]/70">Advantage</p>
+                        <p className="font-medium text-[#63A361]">{analysis.valueAddition.storageRecommendations.priceAdvantage}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Risk Assessment */}

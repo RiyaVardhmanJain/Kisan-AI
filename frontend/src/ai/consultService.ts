@@ -29,7 +29,8 @@ export interface ConsultAnalysisResponse {
     nextPhase: string;
     daysToNextPhase: number;
   };
-  storageStrategy: {
+  // Only present for harvest/post-harvest phases
+  storageStrategy?: {
     method: string;
     duration: string;
     optimalTemp: string;

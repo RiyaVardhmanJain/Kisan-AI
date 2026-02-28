@@ -36,6 +36,8 @@ Provide realistic growth phases for ${input.cropName} with approximate day range
  * Get comprehensive business-focused prompt for crop analysis
  */
 export function getConsultAnalysisPrompt(input: ConsultAnalysisInput): string {
+  const isHarvestPhase = /harvest|post.harvest|ripen|maturation|maturity|ready|storage/i.test(input.currentPhase);
+
   return `You are a concise agricultural business advisor. Analyze the crop scenario and provide focused, actionable insights.
 
 FARMER'S DETAILS:
@@ -45,11 +47,11 @@ FARMER'S DETAILS:
 - Location: ${input.tahsil}
 
 INSTRUCTIONS: Be extremely concise. Use short sentences. Focus only on essential information. Avoid lengthy explanations.
-PRIORITY: Storage strategy and spoilage prevention should be the most detailed section.
+${isHarvestPhase ? 'PRIORITY: Storage strategy and spoilage prevention should be the most detailed section.' : 'PRIORITY: Farming schedule and pest management are the most important sections for this growth phase.'}
 
 Return ONLY valid JSON:
 
-{
+${isHarvestPhase ? `{
   "growthInsights": {
     "totalGrowthDuration": "X days",
     "currentDayOfGrowth": number,
@@ -67,7 +69,15 @@ Return ONLY valid JSON:
     "priceAdvantage": "Y% price advantage if stored until peak season",
     "spoilageRisk": "Low/Medium/High with explanation",
     "emergencyActions": ["action1 if spoilage detected", "action2", "action3"]
-  },
+  },` : `{
+  "growthInsights": {
+    "totalGrowthDuration": "X days",
+    "currentDayOfGrowth": number,
+    "daysToHarvest": number,
+    "progressPercentage": number,
+    "nextPhase": "Phase name",
+    "daysToNextPhase": number
+  },`}
   "yieldForecast": {
     "expectedYieldPerAcre": "X kg/acre",
     "totalYieldForecast": "Y kg total"
@@ -220,13 +230,13 @@ export function parseConsultAnalysis(response: string): any {
     // Validate required fields
     const requiredFields = [
       'growthInsights',
-      'storageStrategy',
       'yieldForecast',
       'farmingSchedule',
       'marketIntelligence',
       'valueAddition',
       'riskForecast',
       'actionableRecommendations'
+      // storageStrategy is optional — only present for harvest/post-harvest phases
     ];
 
     for (const field of requiredFields) {
